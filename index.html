@@ -413,6 +413,7 @@ select.form-input{cursor:pointer;}
     <div class="tb-time" id="tb-time"></div>
         <button class="tb-btn" onclick="showView('journal')">📋 Journal</button>
     <button class="tb-btn" onclick="showView('rapport')">📊 Rapport</button>
+    <button class="tb-btn" id="btn-dashboard" onclick="showDashboard()" style="display:none;">👁️ Tableau de bord</button>
     <button class="tb-btn" id="btn-config" onclick="showConfig()" style="display:none;">⚙️ Config</button>
     <button class="tb-btn" onclick="logout()" style="opacity:.6;">⬅ Quitter</button>
   </div>
@@ -485,6 +486,19 @@ select.form-input{cursor:pointer;}
 </div>
 
 <!-- VIEWS -->
+
+<!-- ══ TABLEAU DE BORD PATRON ══ -->
+<div id="view-dashboard" class="view">
+  <div class="view-hd">
+    <button class="view-back" onclick="hideViews()">← Retour</button>
+    <h1>👁️ Tableau de bord en direct</h1>
+    <button onclick="loadDashboard()" style="margin-left:auto;background:var(--amber);border:none;color:#fff;padding:6px 14px;border-radius:var(--rs);cursor:pointer;font-size:12px;font-weight:800;font-family:var(--font-body);">🔄 Actualiser</button>
+  </div>
+  <div id="dashboard-content">
+    <div style="text-align:center;padding:40px;color:var(--muted);">Chargement en cours...</div>
+  </div>
+</div>
+
 <div id="view-journal" class="view">
   <div class="view-hd"><button class="view-back" onclick="hideViews()">← Retour</button><h1>📋 Journal d'audit</h1><span style="font-size:12px;color:var(--muted);margin-left:auto;" id="journal-count"></span></div>
   <div class="filter-row">
@@ -571,7 +585,7 @@ select.form-input{cursor:pointer;}
 <script>
 
 // ══ VERSION CHECK — recharge le menu si nouvelle version ══
-const APP_VERSION = '2.1';
+const APP_VERSION = '3.1';
 (function(){
   const saved = localStorage.getItem('tpos6_version');
   if(saved !== APP_VERSION){
@@ -582,6 +596,49 @@ const APP_VERSION = '2.1';
     localStorage.setItem('tpos6_version', APP_VERSION);
   }
 })();
+
+
+// ══ FIREBASE SYNC ══
+const FB_URL = 'https://djadja-caisse-default-rtdb.firebaseio.com';
+const DEVICE_ID = localStorage.getItem('tpos_device_id') || (() => {
+  const id = 'dev_' + Math.random().toString(36).slice(2,10);
+  localStorage.setItem('tpos_device_id', id);
+  return id;
+})();
+
+async function fbPush(path, data) {
+  try {
+    await fetch(FB_URL + path + '.json', {
+      method: 'POST',
+      body: JSON.stringify({...data, device: DEVICE_ID, ts: Date.now()})
+    });
+  } catch(e) {}
+}
+
+async function fbSet(path, data) {
+  try {
+    await fetch(FB_URL + path + '.json', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  } catch(e) {}
+}
+
+async function syncJournalEntry(entry) {
+  await fbPush('/journal', entry);
+}
+
+async function syncStats() {
+  if(!S.user) return;
+  await fbSet('/stats/' + DEVICE_ID, {
+    serveur: S.user ? S.user.name : '—',
+    ca: S.dayCA,
+    tickets: S.dayTickets,
+    tables_occupees: TABLES.filter(t => hasOrders(t)).length,
+    last_update: new Date().toLocaleTimeString('fr-FR'),
+    ts: Date.now()
+  });
+}
 
 // ══ REAL MENU CHEZ DJADJA ══
 const DEFAULT_MENU={
@@ -622,11 +679,15 @@ const DEFAULT_MENU={
     {e:'🔄',n:'Changement tête Awai',p:2000},{e:'🔄',n:'Changement tête Lady Killer',p:2000},
   ],
   'Sauces & Plats 🍽️':[
-    {e:'🍲',n:'Sauce Moyo',p:3000},{e:'🍲',n:'Sauce Assrokui',p:3500},
+    {e:'🍲',n:'Moyo (S) 3500',p:3500},{e:'🍲',n:'Moyo (M) 4000',p:4000},
+    {e:'🍲',n:'Moyo (L) 5000',p:5000},
+    {e:'🍲',n:'Bomiwo (S) 3500',p:3500},{e:'🍲',n:'Bomiwo (M) 4000',p:4000},
+    {e:'🍲',n:'Bomiwo (L) 5000',p:5000},
+    {e:'🍲',n:'Assrokouin (S) 3500',p:3500},{e:'🍲',n:'Assrokouin (L) 5000',p:5000},
+    {e:'🍲',n:'Sauce Crincrin',p:3000},{e:'🫘',n:'Sauce Gombo',p:3000},
     {e:'🍲',n:'Sauce Tomate (S)',p:3000},{e:'🍲',n:'Sauce Tomate (M)',p:4000},
     {e:'🍲',n:'Sauce Tomate (L)',p:5000},{e:'🥬',n:'Légume Oman Tindjan',p:3000},
-    {e:'🥬',n:'Sauce Crincrin',p:3000},{e:'🫘',n:'Sauce Gombo',p:3000},
-    {e:'🍲',n:'Sauce Bomiwo',p:3500},
+    {e:'🐑',n:'Sauce Mouton+Acc (S) 4000',p:4000},{e:'🐑',n:'Sauce Mouton+Acc (L) 5000',p:5000},
   ],
   'Viandes & Poissons 🥩':[
     {e:'🍗',n:'Poulet bicyclette braisé',p:0},{e:'🍗',n:'Poulet bicyclette frit',p:0},
@@ -637,26 +698,23 @@ const DEFAULT_MENU={
     {e:'🐟',n:'Bexr frit',p:0},{e:'🐟',n:'Carpe',p:0},
   ],
   'Accompagnements 🍚':[
-    {e:'🍚',n:'Le Riz',p:0},{e:'🫙',n:'Pâte noire',p:0},
-    {e:'🫙',n:'Pâte rouge',p:0},{e:'🫙',n:'Pâte blanche',p:0},
-    {e:'🫙',n:'Akassa',p:0},{e:'🫙',n:'Piron rouge',p:0},
-    {e:'🫙',n:'Piron simple',p:0},{e:'🍟',n:'Frites',p:0},
+    {e:'🍚',n:'Riz 1000',p:1000},
+    {e:'🍚',n:'Riz+Acc (S) 3000',p:3000},{e:'🍚',n:'Riz+Acc (M) 3500',p:3500},{e:'🍚',n:'Riz+Acc (L) 4000',p:4000},
+    {e:'🫙',n:'Pâte rouge+Acc (S) 3500',p:3500},{e:'🫙',n:'Pâte rouge+Acc (M) 4000',p:4000},
+    {e:'🫙',n:'Pâte noire+Légumes (S) 3500',p:3500},{e:'🫙',n:'Pâte noire+Légumes (L) 5000',p:5000},
+    {e:'🍟',n:'Frites+Acc (S) 3000',p:3000},{e:'🍟',n:'Frites+Acc (M) 3500',p:3500},
+    {e:'🫙',n:'Pâte blanche',p:0},{e:'🫙',n:'Akassa',p:0},
+    {e:'🫙',n:'Piron rouge',p:0},{e:'🫙',n:'Piron simple',p:0},
     {e:'🍌',n:'Alloco',p:0},
   ],
 };
 
 const DEFAULT_USERS=[
   {id:'patron',name:'Patron',role:'Gérant',pin:'1234',emoji:'👑',isAdmin:true},
-  {id:'alice',name:'Alice',role:'Serveuse',pin:'0000',emoji:'👩',isAdmin:false},
-  {id:'marco',name:'Marco',role:'Serveur',pin:'1111',emoji:'👨',isAdmin:false},
-  {id:'s3',name:'Serveuse 3',role:'Serveuse',pin:'2222',emoji:'👩',isAdmin:false},
-  {id:'s4',name:'Serveuse 4',role:'Serveuse',pin:'3333',emoji:'👩',isAdmin:false},
-  {id:'s5',name:'Serveuse 5',role:'Serveuse',pin:'4444',emoji:'👩',isAdmin:false},
-  {id:'s6',name:'Serveuse 6',role:'Serveuse',pin:'5555',emoji:'👩',isAdmin:false},
-  {id:'s7',name:'Serveuse 7',role:'Serveuse',pin:'6666',emoji:'👩',isAdmin:false},
-  {id:'s8',name:'Serveuse 8',role:'Serveuse',pin:'7777',emoji:'👩',isAdmin:false},
-  {id:'s9',name:'Serveuse 9',role:'Serveuse',pin:'8888',emoji:'👩',isAdmin:false},
-  {id:'s10',name:'Serveuse 10',role:'Serveuse',pin:'9999',emoji:'👩',isAdmin:false},
+  {id:'falli',name:'Falli',role:'Serveuse',pin:'0001',emoji:'👩',isAdmin:false},
+  {id:'favour',name:'Favour',role:'Serveuse',pin:'0002',emoji:'👩',isAdmin:false},
+  {id:'chafiou',name:'Chafiou',role:'Serveuse',pin:'0003',emoji:'👩',isAdmin:false},
+  {id:'blessings',name:'Blessings',role:'Serveuse',pin:'0004',emoji:'👩',isAdmin:false},
 ];
 const EMOJIS_PEOPLE=['👑','👩','👨','👧','👦','🧑','👩‍🍳','👨‍🍳','🧑‍💼','🧔'];
 const EMOJIS_FOOD=['🍺','🍻','🥤','💧','🧃','☕','🍵','🥃','🍷','🍹','🧊','🫖','🍾','🥂','🍸','🥜','🍟','🍢','🍗','🍌','🌭','🧀','🫘','🥗','🍱','🍕','🍔','🌮','🍚','🐟','🫙','🥩','🥪','🦐','🍛','🍲','💨','🌺','🍍','🍊','🍉','🍋','🍇','🌿'];
@@ -684,7 +742,12 @@ function genId(){return Math.random().toString(36).slice(2,8);}
 let toastT;
 function toast(msg,type='success'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+type+' show';clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),3200);}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
-function log(type,detail,amount=0){S.journal.unshift({time:fmtT(),type,user:S.user?S.user.name:'—',table:S.activeTable||'—',detail,amount});}
+function log(type,detail,amount=0){
+  const entry={time:fmtT(),type,user:S.user?S.user.name:'—',table:S.activeTable||'—',detail,amount,date:new Date().toLocaleDateString('fr-FR')};
+  S.journal.unshift(entry);
+  syncJournalEntry(entry);
+  syncStats();
+}
 
 // SPLASH & LOGIN
 function showSplash(){
@@ -732,6 +795,7 @@ function verifyPin(){
     document.getElementById('app').style.display='flex';
     document.getElementById('tb-user-name').textContent=S.user.name+' · '+S.user.role;
     document.getElementById('btn-config').style.display=S.user.isAdmin?'block':'none';
+    document.getElementById('btn-dashboard').style.display=S.user.isAdmin?'block':'none';
     S.activeTab=Object.keys(S.menu)[0];
     log('LOGIN','Connexion');initApp();
   }else{
@@ -778,7 +842,87 @@ function clientRefuse(){const t=getTable(S.activeTable);log('CONFIRM',`❌ Round
 document.getElementById('btn-send').onclick=()=>{if(!S.activeTable)return;const t=getTable(S.activeTable);const r=getCurrent(t);if(!r||r.items.length===0){toast('Commande vide','warn');return;}r.sent=true;log('SEND',`R${t.currentRound+1} Cuisine: `+r.items.map(o=>o.qty+'×'+o.name).join(', '),0);document.getElementById('sent-badge').style.display='block';save();toast('✓ Envoyé en cuisine','success');};
 document.getElementById('btn-pay').onclick=()=>{if(!S.activeTable)return;const t=getTable(S.activeTable);if(!hasOrders(t)){toast('Aucune commande','warn');return;}payTarget=t;const gt=grandTotal(t);const unconf=t.rounds.filter(r=>r.items.length>0&&!r.confirmed).length;document.getElementById('pay-msub').textContent=`Table ${t.id} · ${t.rounds.filter(r=>r.items.length>0).length} round(s)${unconf>0?' · ⚠️ '+unconf+' non confirmé(s)':''}`;const ar=t.rounds.filter(r=>r.items.length>0);if(ar.length>1){document.getElementById('pay-rounds-summary').style.display='block';document.getElementById('prs-rows').innerHTML=ar.map((r,i)=>`<div class="prs-row"><span>Round ${i+1} ${r.confirmed?'✅':'⚠️'}</span><strong>${fmtAmt(roundTotal(r))}</strong></div>`).join('');}else document.getElementById('pay-rounds-summary').style.display='none';document.getElementById('pay-total-big').textContent=fmtAmt(gt);S.payMethod='cash';document.querySelectorAll('.pay-method').forEach((el,i)=>el.classList.toggle('selected',i===0));document.getElementById('overlay-pay').classList.add('show');};
 function selPay(m,el){S.payMethod=m;document.querySelectorAll('.pay-method').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');}
-function confirmPay(){if(!payTarget)return;const gt=grandTotal(payTarget);const allItems=payTarget.rounds.flatMap(r=>r.items).reduce((acc,o)=>{const e=acc.find(x=>x.name===o.name);if(e)e.qty+=o.qty;else acc.push({...o});return acc;},[]);const unconf=payTarget.rounds.filter(r=>r.items.length>0&&!r.confirmed).length;log('PAY',`Encaissement ${S.payMethod==='cash'?'Espèces':'Mobile Money'}${unconf>0?' ('+unconf+' non confirmé(s))':''}: `+allItems.map(o=>o.qty+'×'+o.name).join(', '),gt);S.dayCA+=gt;S.dayTickets++;S.paySales[S.payMethod]=(S.paySales[S.payMethod]||0)+gt;payTarget.rounds=[];payTarget.currentRound=0;closeModal('overlay-pay');S.activeTable=null;renderOrder();renderTables();renderStats();save();toast('✓ Table '+payTarget.id+' encaissée — '+fmtAmt(gt),'success');payTarget=null;}
+function confirmPay(){if(!payTarget)return;const gt=grandTotal(payTarget);const allItems=payTarget.rounds.flatMap(r=>r.items).reduce((acc,o)=>{const e=acc.find(x=>x.name===o.name);if(e)e.qty+=o.qty;else acc.push({...o});return acc;},[]);const unconf=payTarget.rounds.filter(r=>r.items.length>0&&!r.confirmed).length;log('PAY',`Encaissement ${S.payMethod==='cash'?'Espèces':'Mobile Money'}${unconf>0?' ('+unconf+' non confirmé(s))':''}: `+allItems.map(o=>o.qty+'×'+o.name).join(', '),gt);S.dayCA+=gt;S.dayTickets++;S.paySales[S.payMethod]=(S.paySales[S.payMethod]||0)+gt;payTarget.rounds=[];payTarget.currentRound=0;closeModal('overlay-pay');S.activeTable=null;renderOrder();renderTables();renderStats();save();toast('✓ Table '+payTarget.id+' encaissée — '+fmtAmt(gt),'success');syncStats();payTarget=null;}
+
+async function showDashboard(){
+  hideConfig();
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('visible'));
+  document.getElementById('view-dashboard').classList.add('visible');
+  loadDashboard();
+}
+
+async function loadDashboard(){
+  const content = document.getElementById('dashboard-content');
+  content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div>';
+  try {
+    // Load stats per device
+    const statsRes = await fetch(FB_URL + '/stats.json');
+    const stats = await statsRes.json() || {};
+    
+    // Load journal
+    const journalRes = await fetch(FB_URL + '/journal.json');
+    const journalRaw = await journalRes.json() || {};
+    const journal = Object.values(journalRaw).sort((a,b) => (b.ts||0)-(a.ts||0)).slice(0,50);
+    
+    // Compute totals
+    const devices = Object.values(stats);
+    const totalCA = devices.reduce((s,d) => s+(d.ca||0), 0);
+    const totalTickets = devices.reduce((s,d) => s+(d.tickets||0), 0);
+    
+    // Build HTML
+    let html2 = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+      <div class="kpi" style="border-top:3px solid var(--amber);">
+        <div class="kpi-v" style="color:var(--amber-d);">${fmtAmt(totalCA)}</div>
+        <div class="kpi-l">CA total combiné</div>
+      </div>
+      <div class="kpi" style="border-top:3px solid var(--green);">
+        <div class="kpi-v" style="color:var(--green);">${totalTickets}</div>
+        <div class="kpi-l">Tickets au total</div>
+      </div>
+      <div class="kpi" style="border-top:3px solid var(--blue);">
+        <div class="kpi-v" style="color:var(--blue);">${devices.length}</div>
+        <div class="kpi-l">Serveuses actives</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div class="r-block">
+        <h3>Par serveuse — en temps réel</h3>
+        ${devices.length === 0 ? '<div style="color:var(--muted);font-size:12px;">Aucune serveuse connectée</div>' :
+          devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d => `
+          <div class="r-row">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;">${d.serveur||'—'}</div>
+              <div style="font-size:10px;color:var(--muted);">${d.tables_occupees||0} table(s) · Mis à jour ${d.last_update||'—'}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmtAmt(d.ca||0)}</div>
+              <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
+            </div>
+          </div>`).join('')
+        }
+      </div>
+      <div class="r-block">
+        <h3>Dernières actions (toutes serveuses)</h3>
+        ${journal.slice(0,15).map(r => {
+          const lbl={ADD:'Ajout',REMOVE:'Suppression',PAY:'Encaissement',SEND:'Cuisine',LOGIN:'Connexion',CONFIRM:'Confirmation',ROUND:'Round'};
+          const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
+          return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+            <span class="jbadge ${cls[r.type]||''}">${lbl[r.type]||r.type}</span>
+            <span style="font-weight:700;">${r.user}</span>
+            <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${r.detail}</span>
+            <span style="color:var(--muted);font-family:monospace;font-size:10px;">${r.time||''}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+    
+    content.innerHTML = html2;
+  } catch(e) {
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);">❌ Erreur de connexion. Vérifiez votre internet.</div>';
+  }
+}
+
 function showView(v){hideConfig();document.querySelectorAll('.view').forEach(x=>x.classList.remove('visible'));if(v==='journal'){renderJournal();document.getElementById('view-journal').classList.add('visible');}if(v==='rapport'){renderRapport();document.getElementById('view-rapport').classList.add('visible');}}
 function hideViews(){document.querySelectorAll('.view').forEach(x=>x.classList.remove('visible'));}
 let jFilter='all';

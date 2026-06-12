@@ -585,7 +585,7 @@ select.form-input{cursor:pointer;}
 <script>
 
 // ══ VERSION CHECK — recharge le menu si nouvelle version ══
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 (function(){
   const saved = localStorage.getItem('tpos6_version');
   if(saved !== APP_VERSION){
@@ -610,18 +610,34 @@ async function fbPush(path, data) {
   try {
     await fetch(FB_URL + path + '.json', {
       method: 'POST',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({...data, device: DEVICE_ID, ts: Date.now()})
     });
-  } catch(e) {}
+  } catch(e) { console.log('fbPush error:', e); }
 }
 
 async function fbSet(path, data) {
   try {
     await fetch(FB_URL + path + '.json', {
       method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(data)
     });
-  } catch(e) {}
+  } catch(e) { console.log('fbSet error:', e); }
+}
+
+async function fbGet(path) {
+  try {
+    const res = await fetch(FB_URL + path + '.json', {
+      method: 'GET',
+      headers: {'Content-Type': 'application/json'},
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) {
+    console.log('fbGet error:', e);
+    return null;
+  }
 }
 
 async function syncJournalEntry(entry) {
@@ -856,13 +872,11 @@ async function loadDashboard(){
   content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div>';
   try {
     // Load stats per device
-    const statsRes = await fetch(FB_URL + '/stats.json');
-    const stats = await statsRes.json() || {};
+    const stats = await fbGet('/stats') || {};
     
     // Load journal
-    const journalRes = await fetch(FB_URL + '/journal.json');
-    const journalRaw = await journalRes.json() || {};
-    const journal = Object.values(journalRaw).sort((a,b) => (b.ts||0)-(a.ts||0)).slice(0,50);
+    const journalRaw = await fbGet('/journal') || {};
+    const journal = journalRaw ? Object.values(journalRaw).sort((a,b) => (b.ts||0)-(a.ts||0)).slice(0,50) : [];
     
     // Compute totals
     const devices = Object.values(stats);

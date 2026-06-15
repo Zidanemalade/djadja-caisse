@@ -361,7 +361,7 @@ select.form-input{cursor:pointer;}
     <div class="tab-panel active" id="tab-tables">
       <div class="tables-header">
         <h2>🪑 Tables</h2>
-        <button onclick="confirmNouveauJour()" style="background:var(--green-l);border:1px solid var(--green);color:var(--green);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">🌅 Nouveau jour</button>
+        
         <div class="tables-stats">
           <div class="ts-item"><span class="ts-val" id="s-ca">0 F</span><span class="ts-lbl">CA jour</span></div>
           <div class="ts-item"><span class="ts-val" id="s-occ">0</span><span class="ts-lbl">Occupées</span></div>
@@ -443,6 +443,7 @@ select.form-input{cursor:pointer;}
       <span id="patron-user-name"></span>
     </div>
     <div style="font-size:10px;font-family:monospace;color:rgba(255,255,255,.5);" id="patron-time"></div>
+    <button onclick="confirmNouveauJour()" style="background:rgba(59,109,17,.3);border:1px solid rgba(59,109,17,.5);color:#a8d17a;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">🌅 Nouveau jour</button>
     <button onclick="logoutPatron()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">⬅ Quitter</button>
   </div>
 
@@ -617,7 +618,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '4.2';
+const APP_VERSION = '5.0';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -640,56 +641,46 @@ async function fbGet(path){try{const r=await fetch(FB_URL+path+'.json',{headers:
 
 // ══ MENU ══
 const DEFAULT_MENU={
-  'Boissons SOBEBRA 🍺':[
+  'Rafraîchissement 🥤':[
     {e:'🍺',n:'Béninoise Petit',p:800},{e:'🍺',n:'EKU Petit',p:800},
     {e:'🍺',n:'Beaufort Petit',p:800},{e:'🍺',n:'Chill Petit',p:800},
     {e:'🍺',n:'Pils Petit',p:800},{e:'🍺',n:'Guinesse',p:1200},
     {e:'🍺',n:'Dopel Petit',p:700},{e:'🍺',n:'Heineken',p:1200},
     {e:'⚡',n:'Energie',p:1200},{e:'💧',n:'Vody',p:1500},
     {e:'🍺',n:'Desperado',p:2000},
-  ],
-  'Jus & Softdrinks 🧃':[
     {e:'🍍',n:'Jus Ananas',p:1500},{e:'🍊',n:'Jus Orange',p:1500},
     {e:'🍉',n:'Jus Pastèque',p:2000},{e:'🍋',n:'Limonade',p:1500},
     {e:'🌺',n:'Bissape',p:1000},{e:'🍇',n:'Jus Raisin',p:2000},
     {e:'🌿',n:'Jus Menthe',p:1500},{e:'🥤',n:'Coca canette',p:1000},
     {e:'🥤',n:'Béninoise canette',p:1000},{e:'🥤',n:'Sprite canette',p:1000},
     {e:'🧃',n:'Youki Pamplemousse',p:1000},{e:'🧃',n:'Youki Cocktail',p:1000},
-  ],
-  'Champagnes & Vins 🥂':[
     {e:'🍾',n:'Moët Chandon',p:50000},{e:'🍾',n:'Veuve Clicot',p:60000},
     {e:'🍾',n:'Luc Bélaire',p:40000},{e:'🥂',n:'Martel Mousseux',p:8000},
     {e:'🥂',n:'JP Chenet Mousseux',p:10000},{e:'🍷',n:'Vin Blanc',p:7000},
     {e:'🍷',n:'Vin Rouge',p:8000},{e:'🍷',n:'Vin Bordeaux',p:15000},
-  ],
-  'Whisky & Alcools 🥃':[
-    {e:'🥃',n:'Jack Daniel\'s',p:25000},{e:'🥃',n:'Red Label',p:17000},
+    {e:'🥃',n:"Jack Daniel's",p:25000},{e:'🥃',n:'Red Label',p:17000},
     {e:'🥃',n:'Campari',p:20000},{e:'🥃',n:'Hennessy',p:50000},
     {e:'🥃',n:'Marte',p:50000},{e:'🥃',n:'Bumbu',p:50000},
     {e:'🍹',n:'Short Cocktail',p:3000},{e:'🍹',n:'Mojito',p:3000},
     {e:'🌾',n:'Sodabi',p:500},{e:'🌴',n:'Vin de Palme',p:1000},
   ],
-  'Chicha 💨':[
-    {e:'💨',n:'Chicha Arôme Love',p:3000},{e:'💨',n:'Chicha Arôme Menthe',p:3000},
-    {e:'💨',n:'Chicha Arôme Awai',p:3000},{e:'💨',n:'Chicha Lady Killer',p:3000},
-    {e:'🔄',n:'Changement tête Love',p:2000},{e:'🔄',n:'Changement tête Menthe',p:2000},
-    {e:'🔄',n:'Changement tête Awai',p:2000},{e:'🔄',n:'Changement tête Lady Killer',p:2000},
-  ],
-  'Sauces & Plats 🍽️':[
-    {e:'🍲',n:'Moyo (S) 3500',p:3500},{e:'🍲',n:'Moyo (M) 4000',p:4000},{e:'🍲',n:'Moyo (L) 5000',p:5000},
-    {e:'🍲',n:'Bomiwo (S) 3500',p:3500},{e:'🍲',n:'Bomiwo (M) 4000',p:4000},{e:'🍲',n:'Bomiwo (L) 5000',p:5000},
-    {e:'🍲',n:'Assrokouin (S) 3500',p:3500},{e:'🍲',n:'Assrokouin (L) 5000',p:5000},
-    {e:'🐑',n:'Sauce Mouton+Acc (S) 4000',p:4000},{e:'🐑',n:'Sauce Mouton+Acc (L) 5000',p:5000},
+  'Repas 🍽️':[
+    {e:'🍲',n:'Moyo (S)',p:3500},{e:'🍲',n:'Moyo (M)',p:4000},{e:'🍲',n:'Moyo (L)',p:5000},
+    {e:'🍲',n:'Bomiwo (S)',p:3500},{e:'🍲',n:'Bomiwo (M)',p:4000},{e:'🍲',n:'Bomiwo (L)',p:5000},
+    {e:'🍲',n:'Assrokouin (S)',p:3500},{e:'🍲',n:'Assrokouin (L)',p:5000},
+    {e:'🐑',n:'Sauce Mouton+Acc (S)',p:4000},{e:'🐑',n:'Sauce Mouton+Acc (L)',p:5000},
     {e:'🍲',n:'Sauce Crincrin',p:3000},{e:'🫘',n:'Sauce Gombo',p:3000},
     {e:'🍲',n:'Sauce Tomate (S)',p:3000},{e:'🍲',n:'Sauce Tomate (M)',p:4000},{e:'🍲',n:'Sauce Tomate (L)',p:5000},
     {e:'🥬',n:'Légume Oman Tindjan',p:3000},
+    {e:'🍚',n:'Riz',p:1000},
+    {e:'🍚',n:'Riz+Acc (S)',p:3000},{e:'🍚',n:'Riz+Acc (M)',p:3500},{e:'🍚',n:'Riz+Acc (L)',p:4000},
+    {e:'🫙',n:'Pâte rouge+Acc (S)',p:3500},{e:'🫙',n:'Pâte rouge+Acc (M)',p:4000},
+    {e:'🫙',n:'Pâte noire+Légumes (S)',p:3500},{e:'🫙',n:'Pâte noire+Légumes (L)',p:5000},
+    {e:'🍟',n:'Frites+Acc (S)',p:3000},{e:'🍟',n:'Frites+Acc (M)',p:3500},
   ],
-  'Accompagnements 🍚':[
-    {e:'🍚',n:'Riz 1000',p:1000},
-    {e:'🍚',n:'Riz+Acc (S) 3000',p:3000},{e:'🍚',n:'Riz+Acc (M) 3500',p:3500},{e:'🍚',n:'Riz+Acc (L) 4000',p:4000},
-    {e:'🫙',n:'Pâte rouge+Acc (S) 3500',p:3500},{e:'🫙',n:'Pâte rouge+Acc (M) 4000',p:4000},
-    {e:'🫙',n:'Pâte noire+Légumes (S) 3500',p:3500},{e:'🫙',n:'Pâte noire+Légumes (L) 5000',p:5000},
-    {e:'🍟',n:'Frites+Acc (S) 3000',p:3000},{e:'🍟',n:'Frites+Acc (M) 3500',p:3500},
+  'Chicha 💨':[
+    {e:'💨',n:'Chicha',p:3000},
+    {e:'🔄',n:'Changement de tête',p:2000},
   ],
 };
 const DEFAULT_USERS=[
@@ -869,8 +860,19 @@ function updateNavBadges(){
 // ══ MENU ══
 function renderCatTabs(){
   const t=document.getElementById('cat-tabs');t.innerHTML='';
-  const cats=Object.keys(S.menu);if(!cats.includes(S.activeTab))S.activeTab=cats[0];
-  cats.forEach(cat=>{const b=document.createElement('button');b.className='cat-tab'+(S.activeTab===cat?' active':'');b.textContent=cat;b.onclick=()=>{S.activeTab=cat;renderCatTabs();renderItems();};t.appendChild(b);});
+  const cats=Object.keys(S.menu);
+  cats.forEach(cat=>{
+    const b=document.createElement('button');
+    b.className='cat-tab'+(S.activeCategory===cat?' active':'');
+    b.textContent=cat;
+    b.onclick=()=>{
+      S.activeCategory=cat;
+      document.querySelectorAll('.cat-tab').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      renderItems();
+    };
+    t.appendChild(b);
+  });
 }
 function renderItems(){
   const g=document.getElementById('items-grid');g.innerHTML='';
@@ -1166,17 +1168,21 @@ function deleteItem(){const{idx,cat}=editItem;if(idx===null)return;if(!confirm('
 function renderCfgTables(c){c.innerHTML=`<div class="cfg-hd"><h2>🪑 Tables</h2></div><div class="cfg-section"><div class="cfg-section-hd">Nombre de tables</div><div style="padding:16px;"><p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Actuellement : <strong>${S.tableCount} tables</strong></p><div style="display:flex;align-items:center;gap:12px;"><input type="range" min="4" max="30" value="${S.tableCount}" id="table-range" style="flex:1;" oninput="document.getElementById('tcd').textContent=this.value"/><span id="tcd" style="font-size:20px;font-weight:800;min-width:30px;">${S.tableCount}</span></div><button class="cfg-btn primary" style="margin-top:14px;" onclick="applyTableCount()">✓ Appliquer</button></div></div>`;}
 function applyTableCount(){const n=parseInt(document.getElementById('table-range').value);if(!confirm('Changer à '+n+' tables ?'))return;S.tableCount=n;initTables();save();renderTables();renderStats();renderCfgTables(document.getElementById('cfg-content'));toast('✓ '+n+' tables','success');}
 function renderCfgSystem(c){c.innerHTML=`<div class="cfg-hd"><h2>🔧 Système</h2></div><div class="cfg-section"><div class="cfg-section-hd">Données du jour</div><div style="padding:14px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:13px;color:var(--muted);">CA : <strong style="color:var(--amber-d);">${fmt(S.dayCA)}</strong> · Tickets : <strong>${S.dayTickets}</strong></div><button class="cfg-btn edit" onclick="exportRapport()">⬇ Exporter le rapport</button><button class="cfg-btn del" onclick="resetDay()">🔄 Réinitialiser le jour</button></div></div><div class="cfg-section"><div class="cfg-section-hd">Remise à zéro</div><div style="padding:14px;"><button class="cfg-btn del" onclick="fullReset()">⛔ Tout effacer</button></div></div>`;}
-function confirmNouveauJour(){
-  if(!confirm('Démarrer un nouveau jour de service ?\nCela va effacer le CA, les tickets et toutes les commandes en cours.'))return;
+async function confirmNouveauJour(){
+  if(!confirm('Démarrer un nouveau jour ?\nCela efface le CA, les tickets, les commandes et les données de toutes les serveuses.'))return;
+  // Reset local data
   S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};
   TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
   S.activeTable=null;
   save();
-  // Clear Firebase for fresh day
-  fbSet('/stats/'+DEVICE_ID,null);
-  try{fbSet('/journal',null);}catch(e){}
-  renderTables();renderStats();renderOrder();updateNavBadges();
-  toast('🌅 Nouveau jour démarré !','success');
+  // Clear ALL Firebase data
+  try{
+    await fbSet('/stats',null);
+    await fbSet('/journal',null);
+  }catch(e){}
+  toast('🌅 Nouveau jour démarré pour toutes les serveuses !','success');
+  // Reload patron journal
+  setTimeout(loadPatronJournal, 500);
 }
 
 function resetDay(){

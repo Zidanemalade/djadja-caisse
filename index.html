@@ -23,6 +23,21 @@
 }
 body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
 
+/* ══ PATRON MODE ══ */
+#patron-app{display:none;height:100vh;flex-direction:column;}
+#patron-app.visible{display:flex;}
+.patron-topbar{display:flex;align-items:center;gap:8px;padding:0 14px;height:var(--topbar);background:linear-gradient(90deg,#1a0e05,#2d1a07);color:#fff;flex-shrink:0;border-bottom:1px solid rgba(201,150,42,.2);}
+.patron-topbar .tl1{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#C9962A;opacity:.8;}
+.patron-topbar .tl2{font-family:var(--font-d);font-size:14px;font-weight:700;color:#FAC775;line-height:1.1;}
+.patron-content{flex:1;overflow-y:auto;background:var(--bg);}
+.patron-nav{display:flex;background:var(--card);border-bottom:1px solid var(--border);padding:0 14px;overflow-x:auto;gap:0;}
+.patron-nav-btn{padding:12px 16px;font-size:12px;font-weight:700;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:all .15s;font-family:var(--font-b);}
+.patron-nav-btn.active{color:var(--amber-d);border-bottom-color:var(--amber);}
+.patron-panel{display:none;padding:14px;}
+.patron-panel.active{display:block;}
+.patron-kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
+.live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 /* ══ SPLASH ══ */
 #splash-screen{position:fixed;inset:0;z-index:1500;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;}
 #splash-screen.show{display:flex;}
@@ -346,6 +361,7 @@ select.form-input{cursor:pointer;}
     <div class="tab-panel active" id="tab-tables">
       <div class="tables-header">
         <h2>🪑 Tables</h2>
+        <button onclick="confirmNouveauJour()" style="background:var(--green-l);border:1px solid var(--green);color:var(--green);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">🌅 Nouveau jour</button>
         <div class="tables-stats">
           <div class="ts-item"><span class="ts-val" id="s-ca">0 F</span><span class="ts-lbl">CA jour</span></div>
           <div class="ts-item"><span class="ts-val" id="s-occ">0</span><span class="ts-lbl">Occupées</span></div>
@@ -414,6 +430,78 @@ select.form-input{cursor:pointer;}
       <div class="bnav-label">Commande</div>
       <div class="bnav-badge" id="bnav-order-badge" style="display:none;"></div>
     </button>
+  </div>
+</div>
+
+<!-- ══ PATRON APP ══ -->
+<div id="patron-app">
+  <div class="patron-topbar">
+    <div><div class="tl1">Gérant</div><div class="tl2">CHEZ DJADJA</div></div>
+    <div style="flex:1;"></div>
+    <div style="font-size:11px;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:4px;">
+      <div style="width:6px;height:6px;border-radius:50%;background:#C9962A;"></div>
+      <span id="patron-user-name"></span>
+    </div>
+    <div style="font-size:10px;font-family:monospace;color:rgba(255,255,255,.5);" id="patron-time"></div>
+    <button onclick="logoutPatron()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">⬅ Quitter</button>
+  </div>
+
+  <div class="patron-nav">
+    <button class="patron-nav-btn active" onclick="switchPatronTab('journal',this)">📋 Journal</button>
+    <button class="patron-nav-btn" onclick="switchPatronTab('dashboard',this)">👁️ Tableau de bord</button>
+    <button class="patron-nav-btn" onclick="switchPatronTab('rapport',this)">📊 Rapport</button>
+    <button class="patron-nav-btn" onclick="switchPatronTab('config',this)">⚙️ Configuration</button>
+  </div>
+
+  <div class="patron-content">
+    <!-- JOURNAL PATRON -->
+    <div class="patron-panel active" id="patron-panel-journal">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:var(--font-d);font-size:18px;font-weight:700;">📋 Journal d'audit</div>
+        <span id="patron-journal-count" style="font-size:11px;color:var(--muted);"></span>
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="filterPatronJournal('all',this)">Tout</button>
+        <button class="filter-btn" onclick="filterPatronJournal('ADD',this)">Ajouts</button>
+        <button class="filter-btn" onclick="filterPatronJournal('REMOVE',this)">Suppressions</button>
+        <button class="filter-btn" onclick="filterPatronJournal('CONFIRM',this)">Confirmations</button>
+        <button class="filter-btn" onclick="filterPatronJournal('PAY',this)">Encaissements</button>
+      </div>
+      <table class="jtable"><thead><tr><th>Heure</th><th>Type</th><th>Serveuse</th><th>Table</th><th>Détail</th><th>Montant</th></tr></thead>
+      <tbody id="patron-journal-body"></tbody></table>
+    </div>
+
+    <!-- DASHBOARD PATRON -->
+    <div class="patron-panel" id="patron-panel-dashboard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:var(--font-d);font-size:18px;font-weight:700;"><span class="live-dot"></span>En direct</div>
+        <button onclick="loadPatronDashboard()" style="background:var(--amber);border:none;color:#fff;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">🔄 Actualiser</button>
+      </div>
+      <div id="patron-dashboard-content"><div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div></div>
+    </div>
+
+    <!-- RAPPORT PATRON -->
+    <div class="patron-panel" id="patron-panel-rapport">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:var(--font-d);font-size:18px;font-weight:700;">📊 Rapport du jour</div>
+        <button onclick="exportPatronRapport()" style="background:linear-gradient(135deg,#C9962A,#FAC775);border:none;color:#1a0e05;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">⬇ Exporter</button>
+      </div>
+      <div class="patron-kpi-grid" id="patron-kpi-grid"></div>
+      <div class="r-block"><h3>Top articles</h3><div id="patron-top-articles"></div></div>
+      <div class="r-block" style="margin-top:12px;"><h3>Par serveuse</h3><div id="patron-by-serveur"></div></div>
+    </div>
+
+    <!-- CONFIG PATRON -->
+    <div class="patron-panel" id="patron-panel-config">
+      <div style="font-family:var(--font-d);font-size:18px;font-weight:700;margin-bottom:12px;">⚙️ Configuration</div>
+      <div class="patron-nav" style="border:none;padding:0;margin-bottom:14px;gap:6px;overflow-x:auto;">
+        <button class="filter-btn active" onclick="switchPatronCfg('users',this)">👥 Serveurs</button>
+        <button class="filter-btn" onclick="switchPatronCfg('menu',this)">🍽️ Menu</button>
+        <button class="filter-btn" onclick="switchPatronCfg('tables',this)">🪑 Tables</button>
+        <button class="filter-btn" onclick="switchPatronCfg('system',this)">🔧 Système</button>
+      </div>
+      <div id="patron-cfg-content"></div>
+    </div>
   </div>
 </div>
 
@@ -529,7 +617,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '4.0';
+const APP_VERSION = '4.2';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -615,7 +703,7 @@ const EMOJIS_P=['👑','👩','👨','👧','👦','🧑','👩‍🍳','👨‍
 const EMOJIS_F=['🍺','🍻','🥤','💧','🧃','☕','🍵','🥃','🍷','🍹','🧊','🫖','🍾','🥂','🍸','🥜','🍟','🍢','🍗','🍌','🌭','🧀','🫘','🥗','🍱','🍕','🍔','🌮','🍚','🐟','🫙','🥩','🥪','🦐','🍛','🍲','💨','🌺','🍍','🍊','🍉','🍋','🍇','🌿','🐑','🔄'];
 const EMOJIS_C=['🍺','🥤','☕','🥜','🍽️','🥩','🍰','🥗','🍷','🍾','🥂','🥃','💨','🌴','🧃','🫙'];
 
-let S={user:null,activeTable:null,activeTab:'tables',journal:[],dayCA:0,dayTickets:0,paySales:{cash:0,mobile:0},payMethod:'cash',users:JSON.parse(JSON.stringify(DEFAULT_USERS)),menu:JSON.parse(JSON.stringify(DEFAULT_MENU)),tableCount:20};
+let S={user:null,activeTable:null,activeTab:'tables',activeCategory:null,journal:[],dayCA:0,dayTickets:0,paySales:{cash:0,mobile:0},payMethod:'cash',users:JSON.parse(JSON.stringify(DEFAULT_USERS)),menu:JSON.parse(JSON.stringify(DEFAULT_MENU)),tableCount:20};
 let TABLES=[];
 let cfgTab='users',editUser=null,editItem=null,editCat=null,payTarget=null,selEmoji='';
 
@@ -623,8 +711,8 @@ function newRound(s){return{items:[],confirmed:false,sent:false,serveur:s,time:f
 function initTables(){TABLES=Array.from({length:S.tableCount},(_,i)=>({id:i+1,rounds:[],currentRound:0}));}
 function getT(id){return TABLES[id-1];}
 function getCR(t){return(t&&t.rounds&&t.rounds.length>0)?t.rounds[t.currentRound]||null:null;}
-function gTotal(t){return(t&&t.rounds)?t.rounds.reduce((s,r)=>s+(r.items||[]).reduce((rs,o)=>rs+o.price*o.qty,0),0):0;}
-function rTotal(r){return(r&&r.items)?r.items.reduce((s,o)=>s+o.price*o.qty,0):0;}
+function gTotal(t){return(t&&t.rounds)?t.rounds.reduce((s,r)=>s+(r.items||[]).reduce((rs,o)=>rs+(Number(o.price)||0)*(Number(o.qty)||0),0),0):0;}
+function rTotal(r){return(r&&r.items)?r.items.reduce((s,o)=>s+(Number(o.price)||0)*(Number(o.qty)||0),0):0;}
 function hasO(t){return(t&&t.rounds)?t.rounds.some(r=>(r.items||[]).length>0):false;}
 
 function save(){try{
@@ -673,7 +761,11 @@ function switchTab(tab){
   document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   document.getElementById('bnav-'+tab).classList.add('active');
-  if(tab==='menu'){renderCatTabs();renderItems();}
+  if(tab==='menu'){
+    const cats=Object.keys(S.menu);
+    if(!S.activeCategory||!cats.includes(S.activeCategory))S.activeCategory=cats[0];
+    renderCatTabs();renderItems();
+  }
   if(tab==='order'){renderOrder();}
 }
 
@@ -705,18 +797,36 @@ function verifyPin(){
     S.user=pendingUser;
     document.getElementById('pin-screen').classList.remove('show');
     document.getElementById('splash-screen').classList.remove('show');
-    document.getElementById('app').style.display='flex';
-    document.getElementById('tb-user').textContent=S.user.name+' · '+S.user.role;
-    document.getElementById('btn-config').style.display=S.user.isAdmin?'block':'none';
-    document.getElementById('btn-dashboard').style.display=S.user.isAdmin?'block':'none';
-    S.activeTab=Object.keys(S.menu)[0];
-    log('LOGIN','Connexion');initApp();
+    S.activeCategory=Object.keys(S.menu)[0];
+    log('LOGIN','Connexion');
+    if(S.user.isAdmin){
+      // PATRON MODE
+      document.getElementById('patron-app').classList.add('visible');
+      document.getElementById('patron-user-name').textContent=S.user.name;
+      loadPatronJournal();
+      setInterval(()=>{document.getElementById('patron-time').textContent=fmtT();},1000);
+    } else {
+      // SERVEUSE MODE
+      document.getElementById('app').style.display='flex';
+      document.getElementById('tb-user').textContent=S.user.name+' · '+S.user.role;
+      initApp();
+    }
   }else{
     document.getElementById('pin-err').textContent='❌ Code incorrect';
     pinBuf='';renderDots();setTimeout(()=>{document.getElementById('pin-err').textContent='';},1800);
   }
 }
-function logout(){log('LOGOUT','Déconnexion');save();S.user=null;S.activeTable=null;document.getElementById('app').style.display='none';hideViews();hideConfig();buildSplash();document.getElementById('splash-screen').classList.add('show');}
+function logout(){
+  log('LOGOUT','Déconnexion');save();S.user=null;S.activeTable=null;
+  document.getElementById('app').style.display='none';
+  hideViews();hideConfig();buildSplash();
+  document.getElementById('splash-screen').classList.add('show');
+}
+function logoutPatron(){
+  log('LOGOUT','Déconnexion Patron');save();S.user=null;
+  document.getElementById('patron-app').classList.remove('visible');
+  buildSplash();document.getElementById('splash-screen').classList.add('show');
+}
 
 // ══ INIT ══
 function initApp(){
@@ -764,7 +874,10 @@ function renderCatTabs(){
 }
 function renderItems(){
   const g=document.getElementById('items-grid');g.innerHTML='';
-  (S.menu[S.activeTab]||[]).forEach(item=>{
+  // Ensure activeCategory is valid
+  const cats=Object.keys(S.menu);
+  if(!S.activeCategory||!cats.includes(S.activeCategory))S.activeCategory=cats[0];
+  (S.menu[S.activeCategory]||[]).forEach(item=>{
     const d=document.createElement('div');d.className='item-card';
     d.innerHTML=`<div class="item-emoji">${item.e}</div><div class="item-name">${item.n}</div><div class="item-price">${fmt(item.p)}</div>`;
     d.onclick=()=>addItem(item);g.appendChild(d);
@@ -860,7 +973,7 @@ function renderOrder(){
   else document.getElementById('total-grand').style.display='none';
 
   document.getElementById('conf-badge').style.display=r&&r.confirmed?'block':'none';
-  document.getElementById('warn-badge').style.display=r&&!r.confirmed&&r&&r.items.length>0?'block':'none';
+  document.getElementById('warn-badge').style.display=r&&!r.confirmed&&r.items&&r.items.length>0?'block':'none';
   document.getElementById('sent-badge').style.display=r&&r.sent?'block':'none';
   document.getElementById('btn-new-round').disabled=!r||!r.confirmed||r.items.length===0;
 
@@ -927,7 +1040,7 @@ function confirmPay(){
   S.dayCA+=gt;S.dayTickets++;S.paySales[S.payMethod]=(S.paySales[S.payMethod]||0)+gt;
   payTarget.rounds=[];payTarget.currentRound=0;
   closeModal('overlay-pay');S.activeTable=null;
-  switchTab('tables');renderTables();renderStats();updateNavBadges();save();
+  switchTab('tables');renderTables();renderStats();updateNavBadges();renderOrder();save();
   toast('✓ Encaissée — '+fmt(gt),'success');payTarget=null;
 }
 
@@ -975,8 +1088,16 @@ function renderRapport(){
     <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(v/maxU*100)}%;background:var(--teal);"></div></div></div>
     <div class="r-val">${fmt(v)}</div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucun encaissement</div>';
 }
-function exportRapport(){
-  const lines=['RAPPORT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),'Tél: 01 69 72 94 71','='.repeat(40),'CA: '+fmt(S.dayCA),'Tickets: '+S.dayTickets,'','JOURNAL:','-'.repeat(40),...S.journal.map(r=>`[${r.time}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)];
+async function exportRapport(){
+  let fbJournal = [];
+  try{
+    const raw = await fbGet('/journal');
+    if(raw) fbJournal = Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  }catch(e){}
+  const allEntries = fbJournal.length > S.journal.length ? fbJournal : S.journal;
+  const totalCA_fb = await fbGet('/stats').then(s=>s?Object.values(s).reduce((t,d)=>t+(d.ca||0),0):S.dayCA).catch(()=>S.dayCA);
+  
+  const lines=['RAPPORT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),'Tél: 01 69 72 94 71','='.repeat(40),'CA Total (toutes serveuses): '+fmt(totalCA_fb),'CA Local: '+fmt(S.dayCA),'Tickets: '+S.dayTickets,'','JOURNAL COMPLET:','-'.repeat(40),...allEntries.map(r=>`[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)];  
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));a.download='rapport_djadja_'+new Date().toISOString().slice(0,10)+'.txt';a.click();
 }
 
@@ -1031,27 +1152,199 @@ function showConfig(){hideViews();document.getElementById('view-config').classLi
 function hideConfig(){document.getElementById('view-config').classList.remove('visible');}
 function showCfgTab(tab,el){cfgTab=tab;document.querySelectorAll('.cfg-nav-item').forEach(x=>x.classList.remove('active'));if(el)el.classList.add('active');renderCfgTab(tab);}
 function renderCfgTab(tab){const c=document.getElementById('cfg-content');if(tab==='users')renderCfgUsers(c);else if(tab==='menu')renderCfgMenu(c);else if(tab==='tables')renderCfgTables(c);else if(tab==='system')renderCfgSystem(c);}
-function renderCfgUsers(c){c.innerHTML=`<div class="cfg-hd"><h2>👥 Serveurs</h2><button class="cfg-btn add" onclick="openUserModal(null)" style="margin-left:auto;">+ Ajouter</button></div><div class="cfg-section"><div class="cfg-section-hd"><span>${S.users.length} profil(s)</span></div><div id="cfg-users-rows"></div></div>`;const rows=document.getElementById('cfg-users-rows');S.users.forEach((u,i)=>{const d=document.createElement('div');d.className='cfg-row';d.innerHTML=`<div class="emoji-big">${u.emoji}</div><div class="cfg-row-info"><div class="cfg-row-name">${u.name}</div><div class="cfg-row-sub">${u.role} · PIN: <span style="font-family:monospace;background:var(--bg);padding:1px 6px;border-radius:4px;">${u.pin}</span>${u.isAdmin?' · 👑':''}</div></div><button class="cfg-btn edit" onclick="openUserModal(${i})">✏️</button>`;rows.appendChild(d);});}
+function renderCfgUsers(c){c.innerHTML=`<div class="cfg-hd"><h2>👥 Serveurs</h2><button class="cfg-btn add" onclick="openUserModal(null)" style="margin-left:auto;">+ Ajouter</button></div><div class="cfg-section"><div class="cfg-section-hd"><span>${S.users.length} profil(s)</span></div><div id="cfg-users-rows"></div></div>`;const rows=document.getElementById('cfg-users-rows');S.users.forEach((u,i)=>{const d=document.createElement('div');d.className='cfg-row';d.innerHTML=`<div class="emoji-big">${u.emoji}</div><div class="cfg-row-info"><div class="cfg-row-name">${u.name}</div><div class="cfg-row-sub">${u.role} · PIN: <span style="font-family:monospace;background:var(--bg);padding:1px 6px;border-radius:4px;">••••</span>${u.isAdmin?' · 👑':''}</div></div><button class="cfg-btn edit" onclick="openUserModal(${i})">✏️</button>`;rows.appendChild(d);});}
 function openUserModal(idx){editUser=idx;document.getElementById('um-title').textContent=idx===null?'Ajouter':'Modifier';const u=idx!==null?S.users[idx]:{name:'',role:'Serveuse',pin:'',emoji:'👩'};document.getElementById('um-name').value=u.name;document.getElementById('um-role').value=u.role;document.getElementById('um-pin').value=u.pin;selEmoji=u.emoji;buildEmojiPicker('um-emoji-picker',EMOJIS_P,u.emoji);document.getElementById('um-del-btn').style.display=idx!==null&&!S.users[idx].isAdmin?'block':'none';document.getElementById('overlay-user').classList.add('show');}
 function saveUser(){const name=document.getElementById('um-name').value.trim();const role=document.getElementById('um-role').value;const pin=document.getElementById('um-pin').value.trim();const emoji=selEmoji||'👤';if(!name){toast('Entrez un prénom','warn');return;}if(pin.length!==4||isNaN(pin)){toast('PIN: 4 chiffres','warn');return;}if(editUser===null)S.users.push({id:genId(),name,role,pin,emoji,isAdmin:false});else{const old=S.users[editUser];S.users[editUser]={...old,name,role,pin,emoji};}save();closeModal('overlay-user');renderCfgUsers(document.getElementById('cfg-content'));buildSplash();toast('✓ Enregistré','success');}
 function deleteUser(){if(editUser===null)return;if(S.users[editUser].isAdmin){toast('Impossible','error');return;}if(!confirm('Supprimer ?'))return;S.users.splice(editUser,1);save();closeModal('overlay-user');renderCfgUsers(document.getElementById('cfg-content'));buildSplash();toast('Supprimé','warn');}
 function renderCfgMenu(c){const cats=Object.keys(S.menu);c.innerHTML=`<div class="cfg-hd"><h2>🍽️ Menu</h2><button class="cfg-btn add" onclick="openCatModal(null)" style="margin-left:auto;">+ Catégorie</button></div>`;cats.forEach(cat=>{const items=S.menu[cat];const sec=document.createElement('div');sec.className='cfg-section';sec.style.marginBottom='12px';sec.innerHTML=`<div class="cfg-section-hd"><span>${cat} <span style="color:var(--muted);font-weight:400;font-size:11px;">(${items.length})</span></span><div style="display:flex;gap:6px;"><button class="cfg-btn edit" onclick="openCatModal('${cat}')">✏️</button><button class="cfg-btn add" onclick="openItemModal(null,'${cat}')">+</button></div></div><div id="cat-rows-${CSS.escape(cat)}"></div>`;c.appendChild(sec);const rows=sec.querySelector(`#cat-rows-${CSS.escape(cat)}`);items.forEach((item,i)=>{const d=document.createElement('div');d.className='cfg-row';d.innerHTML=`<div class="emoji-big">${item.e}</div><div class="cfg-row-info"><div class="cfg-row-name">${item.n}</div><div class="cfg-row-sub">${fmt(item.p)}</div></div><button class="cfg-btn edit" onclick="openItemModal(${i},'${cat}')">✏️</button>`;rows.appendChild(d);});});}
 function openCatModal(existingCat){editCat=existingCat;document.getElementById('cm-title').textContent=existingCat?'Modifier':'Nouvelle catégorie';const parts=existingCat?existingCat.split(' '):['',' '];const name=parts.slice(0,-1).join(' ');const emoji=parts[parts.length-1]||'🍽️';document.getElementById('cm-name').value=existingCat?name:'';selEmoji=emoji;buildEmojiPicker('cm-emoji-picker',EMOJIS_C,emoji);document.getElementById('cm-del-btn').style.display=existingCat?'block':'none';document.getElementById('overlay-cat').classList.add('show');}
-function saveCat(){const name=document.getElementById('cm-name').value.trim();const emoji=selEmoji||'🍽️';if(!name){toast('Entrez un nom','warn');return;}const newKey=name+' '+emoji;if(editCat===null||editCat===undefined){if(S.menu[newKey]){toast('Déjà existante','warn');return;}S.menu[newKey]=[];}else{const items=S.menu[editCat];delete S.menu[editCat];S.menu[newKey]=items;if(S.activeTab===editCat)S.activeTab=newKey;}save();closeModal('overlay-cat');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('✓','success');}
-function deleteCat(){if(!editCat)return;if(Object.keys(S.menu).length<=1){toast('Dernière catégorie','error');return;}if(!confirm('Supprimer cette catégorie et ses articles ?'))return;delete S.menu[editCat];S.activeTab=Object.keys(S.menu)[0];save();closeModal('overlay-cat');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('Supprimée','warn');}
+function saveCat(){const name=document.getElementById('cm-name').value.trim();const emoji=selEmoji||'🍽️';if(!name){toast('Entrez un nom','warn');return;}const newKey=name+' '+emoji;if(editCat===null||editCat===undefined){if(S.menu[newKey]){toast('Déjà existante','warn');return;}S.menu[newKey]=[];}else{const items=S.menu[editCat];delete S.menu[editCat];S.menu[newKey]=items;if(S.activeCategory===editCat)S.activeCategory=newKey;}save();closeModal('overlay-cat');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('✓','success');}
+function deleteCat(){if(!editCat)return;if(Object.keys(S.menu).length<=1){toast('Dernière catégorie','error');return;}if(!confirm('Supprimer cette catégorie et ses articles ?'))return;delete S.menu[editCat];S.activeCategory=Object.keys(S.menu)[0];save();closeModal('overlay-cat');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('Supprimée','warn');}
 function openItemModal(idx,cat){editItem={idx,cat};document.getElementById('im-title').textContent=idx===null?'Ajouter':'Modifier';const item=idx!==null?S.menu[cat][idx]:{n:'',p:'',e:'🍽️'};document.getElementById('im-name').value=item.n;document.getElementById('im-price').value=item.p||'';selEmoji=item.e;const sel=document.getElementById('im-cat');sel.innerHTML='';Object.keys(S.menu).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===cat)o.selected=true;sel.appendChild(o);});buildEmojiPicker('im-emoji-picker',EMOJIS_F,item.e);document.getElementById('im-del-btn').style.display=idx!==null?'block':'none';document.getElementById('overlay-item').classList.add('show');}
 function saveItem(){const name=document.getElementById('im-name').value.trim();const price=parseInt(document.getElementById('im-price').value)||0;const cat=document.getElementById('im-cat').value;const emoji=selEmoji||'🍽️';if(!name){toast('Entrez un nom','warn');return;}const{idx,cat:oldCat}=editItem;if(idx===null){if(!S.menu[cat])S.menu[cat]=[];S.menu[cat].push({n:name,p:price,e:emoji});}else{if(cat!==oldCat){S.menu[oldCat].splice(idx,1);if(!S.menu[cat])S.menu[cat]=[];S.menu[cat].push({n:name,p:price,e:emoji});}else S.menu[oldCat][idx]={n:name,p:price,e:emoji};}save();closeModal('overlay-item');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('✓','success');}
 function deleteItem(){const{idx,cat}=editItem;if(idx===null)return;if(!confirm('Supprimer ?'))return;S.menu[cat].splice(idx,1);save();closeModal('overlay-item');renderCfgMenu(document.getElementById('cfg-content'));renderCatTabs();renderItems();toast('Supprimé','warn');}
 function renderCfgTables(c){c.innerHTML=`<div class="cfg-hd"><h2>🪑 Tables</h2></div><div class="cfg-section"><div class="cfg-section-hd">Nombre de tables</div><div style="padding:16px;"><p style="font-size:13px;color:var(--muted);margin-bottom:12px;">Actuellement : <strong>${S.tableCount} tables</strong></p><div style="display:flex;align-items:center;gap:12px;"><input type="range" min="4" max="30" value="${S.tableCount}" id="table-range" style="flex:1;" oninput="document.getElementById('tcd').textContent=this.value"/><span id="tcd" style="font-size:20px;font-weight:800;min-width:30px;">${S.tableCount}</span></div><button class="cfg-btn primary" style="margin-top:14px;" onclick="applyTableCount()">✓ Appliquer</button></div></div>`;}
 function applyTableCount(){const n=parseInt(document.getElementById('table-range').value);if(!confirm('Changer à '+n+' tables ?'))return;S.tableCount=n;initTables();save();renderTables();renderStats();renderCfgTables(document.getElementById('cfg-content'));toast('✓ '+n+' tables','success');}
 function renderCfgSystem(c){c.innerHTML=`<div class="cfg-hd"><h2>🔧 Système</h2></div><div class="cfg-section"><div class="cfg-section-hd">Données du jour</div><div style="padding:14px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:13px;color:var(--muted);">CA : <strong style="color:var(--amber-d);">${fmt(S.dayCA)}</strong> · Tickets : <strong>${S.dayTickets}</strong></div><button class="cfg-btn edit" onclick="exportRapport()">⬇ Exporter le rapport</button><button class="cfg-btn del" onclick="resetDay()">🔄 Réinitialiser le jour</button></div></div><div class="cfg-section"><div class="cfg-section-hd">Remise à zéro</div><div style="padding:14px;"><button class="cfg-btn del" onclick="fullReset()">⛔ Tout effacer</button></div></div>`;}
-function resetDay(){if(!confirm('Réinitialiser le jour ?'))return;S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});save();renderTables();renderStats();renderCfgSystem(document.getElementById('cfg-content'));toast('Réinitialisé','warn');}
+function confirmNouveauJour(){
+  if(!confirm('Démarrer un nouveau jour de service ?\nCela va effacer le CA, les tickets et toutes les commandes en cours.'))return;
+  S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};
+  TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
+  S.activeTable=null;
+  save();
+  // Clear Firebase for fresh day
+  fbSet('/stats/'+DEVICE_ID,null);
+  try{fbSet('/journal',null);}catch(e){}
+  renderTables();renderStats();renderOrder();updateNavBadges();
+  toast('🌅 Nouveau jour démarré !','success');
+}
+
+function resetDay(){
+  if(!confirm('Réinitialiser le jour ?'))return;
+  S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};
+  TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
+  save();
+  // Clear Firebase stats and journal for this device
+  fbSet('/stats/'+DEVICE_ID,null);
+  fbSet('/journal',null);
+  renderTables();renderStats();renderCfgSystem(document.getElementById('cfg-content'));
+  toast('✓ Nouveau jour prêt !','success');
+}
 function fullReset(){if(!confirm('Tout effacer ?'))return;if(!confirm('Confirmer ?'))return;localStorage.clear();location.reload();}
 function buildEmojiPicker(id,emojis,selected){const c=document.getElementById(id);c.innerHTML='';emojis.forEach(em=>{const d=document.createElement('div');d.className='ep-item'+(em===selected?' selected':'');d.textContent=em;d.onclick=()=>{selEmoji=em;c.querySelectorAll('.ep-item').forEach(x=>x.classList.remove('selected'));d.classList.add('selected');};c.appendChild(d);});}
 
+
+// ══ PATRON MODE FUNCTIONS ══
+let patronJournalFilter='all';
+let patronCfgTab='users';
+
+function switchPatronTab(tab,btn){
+  document.querySelectorAll('.patron-nav-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  document.querySelectorAll('.patron-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('patron-panel-'+tab).classList.add('active');
+  if(tab==='journal')loadPatronJournal();
+  if(tab==='dashboard')loadPatronDashboard();
+  if(tab==='rapport')loadPatronRapport();
+  if(tab==='config'){switchPatronCfg(patronCfgTab);}
+}
+
+function filterPatronJournal(f,btn){
+  patronJournalFilter=f;
+  document.querySelectorAll('#patron-panel-journal .filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  loadPatronJournal();
+}
+
+async function loadPatronJournal(){
+  const lbl={ADD:'Ajout',REMOVE:'Suppression',PAY:'Encaissement',SEND:'Cuisine',LOGIN:'Connexion',LOGOUT:'Déconnexion',CONFIRM:'Confirmation',ROUND:'Round'};
+  const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
+  let entries=[];
+  try{
+    const raw=await fbGet('/journal');
+    if(raw)entries=Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    else entries=[...S.journal];
+  }catch(e){entries=[...S.journal];}
+  if(patronJournalFilter!=='all')entries=entries.filter(r=>r.type===patronJournalFilter);
+  document.getElementById('patron-journal-count').textContent=entries.length+' entrées';
+  document.getElementById('patron-journal-body').innerHTML=entries.map(r=>`<tr>
+    <td style="font-family:monospace;font-size:10px;">${r.time||''}</td>
+    <td><span class="jbadge ${cls[r.type]||'j-ADD'}">${lbl[r.type]||r.type}</span></td>
+    <td>${r.user||'—'}</td><td>${r.table==='—'?'—':'T'+r.table}</td>
+    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.detail||''}</td>
+    <td style="font-weight:800;color:${(r.amount||0)>0?'var(--green)':(r.amount||0)<0?'var(--red)':'var(--muted)'};">${r.amount?fmt(Math.abs(r.amount)):''}</td>
+  </tr>`).join('');
+}
+
+async function loadPatronDashboard(){
+  const content=document.getElementById('patron-dashboard-content');
+  content.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div>';
+  try{
+    const stats=await fbGet('/stats')||{};
+    const journalRaw=await fbGet('/journal')||{};
+    const devices=Object.values(stats).filter(d=>d.serveur);
+    const journal=Object.values(journalRaw).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
+    const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
+    const lbl={ADD:'Ajout',REMOVE:'Suppression',PAY:'Encaissement',SEND:'Cuisine',LOGIN:'Connexion',CONFIRM:'Confirmation',ROUND:'Round'};
+    const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
+    content.innerHTML=`
+    <div class="patron-kpi-grid" style="margin-bottom:14px;">
+      <div class="kpi"><div class="kpi-v" style="color:var(--amber-d);">${fmt(totalCA)}</div><div class="kpi-l">CA combiné</div></div>
+      <div class="kpi" style="border-color:var(--green);"><div class="kpi-v" style="color:var(--green);">${totalTk}</div><div class="kpi-l">Tickets total</div></div>
+    </div>
+    <div class="r-block" style="margin-bottom:12px;"><h3>Par serveuse</h3>
+      ${devices.length===0?'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune serveuse active</div>':
+        devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
+        <div class="r-row">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;">${d.serveur}</div>
+            <div style="font-size:10px;color:var(--muted);">${d.tables_occupees||0} table(s) · ${d.last_update||'—'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmt(d.ca||0)}</div>
+            <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="r-block"><h3>Dernières actions</h3>
+      ${journal.slice(0,20).map(r=>`
+      <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+        <span class="jbadge ${cls[r.type]||'j-ADD'}">${lbl[r.type]||r.type}</span>
+        <span style="font-weight:700;white-space:nowrap;">${r.user||'—'}</span>
+        <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${r.detail||''}</span>
+        <span style="color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap;">${r.time||''}</span>
+      </div>`).join('')}
+    </div>`;
+  }catch(e){
+    content.innerHTML='<div style="text-align:center;padding:40px;color:var(--red);">❌ Erreur de connexion. Vérifiez internet.</div>';
+  }
+}
+
+async function loadPatronRapport(){
+  try{
+    const stats=await fbGet('/stats')||{};
+    const devices=Object.values(stats).filter(d=>d.serveur);
+    const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
+    const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
+    const avg=totalTk?Math.round(totalCA/totalTk):0;
+    document.getElementById('patron-kpi-grid').innerHTML=[
+      {v:fmt(totalCA),l:'CA total',c:'var(--amber-d)'},{v:totalTk,l:'Tickets',c:'var(--green)'},
+      {v:fmt(avg),l:'Ticket moyen',c:'var(--teal)'},{v:devices.length,l:'Serveuses actives',c:'var(--blue)'}
+    ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+    // Top articles from journal
+    const journalRaw=await fbGet('/journal')||{};
+    const journal=Object.values(journalRaw);
+    const items={};
+    journal.filter(r=>r.type==='PAY').forEach(r=>{
+      (r.detail||'').replace(/Encaissement[^:]*:/,'').trim().split(', ').forEach(p=>{
+        const m=p.match(/^(\d+)×(.+)$/);if(m)items[m[2].trim()]=(items[m[2].trim()]||0)+parseInt(m[1]);
+      });
+    });
+    const sorted=Object.entries(items).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxQ=sorted[0]?sorted[0][1]:1;
+    document.getElementById('patron-top-articles').innerHTML=sorted.length?sorted.map(([n,q])=>`
+      <div class="r-row"><div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:600;">${n}</div>
+        <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(q/maxQ*100)}%"></div></div>
+      </div><div class="r-val">${q}</div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucune vente</div>';
+    document.getElementById('patron-by-serveur').innerHTML=devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
+      <div class="r-row">
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;">${d.serveur}</div></div>
+        <div class="r-val">${fmt(d.ca||0)}</div>
+      </div>`).join('');
+  }catch(e){}
+}
+
+async function exportPatronRapport(){
+  let allEntries=[];
+  try{const raw=await fbGet('/journal');if(raw)allEntries=Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));}catch(e){}
+  const stats=await fbGet('/stats').catch(()=>({}));
+  const devices=stats?Object.values(stats).filter(d=>d.serveur):[];
+  const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
+  const lines=['RAPPORT GÉRANT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),
+    'Tél: 01 69 72 94 71','='.repeat(50),
+    'CA Total (toutes serveuses): '+fmt(totalCA),
+    ...devices.map(d=>'  '+d.serveur+': '+fmt(d.ca||0)+' ('+( d.tickets||0)+' tickets)'),
+    '','JOURNAL COMPLET:','-'.repeat(40),
+    ...allEntries.map(r=>`[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)
+  ];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
+  a.download='rapport_gerant_'+new Date().toISOString().slice(0,10)+'.txt';a.click();
+}
+
+function switchPatronCfg(tab,btn){
+  patronCfgTab=tab;
+  document.querySelectorAll('#patron-panel-config .filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const c=document.getElementById('patron-cfg-content');
+  if(tab==='users')renderCfgUsers(c);
+  else if(tab==='menu')renderCfgMenu(c);
+  else if(tab==='tables')renderCfgTables(c);
+  else if(tab==='system')renderCfgSystem(c);
+}
+
 // ══ BOOT ══
-initTables();
-load();
 initTables();
 load();
 showSplash();

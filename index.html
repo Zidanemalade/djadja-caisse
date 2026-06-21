@@ -410,6 +410,14 @@ select.form-input{cursor:pointer;}
           <div id="sent-badge" style="display:none;" class="sent-badge">✓ Envoyé en cuisine</div>
         </div>
       </div>
+      <!-- BOUTON ENVOI RAPPORT -->
+      <div style="padding:10px 14px;border-top:1px solid var(--border);background:var(--bg);">
+        <button onclick="envoyerRapportPatron()" id="btn-envoyer-rapport"
+          style="width:100%;padding:10px;background:var(--blue-l);border:1.5px solid var(--blue);border-radius:var(--rs);color:var(--blue);font-size:12px;font-weight:800;cursor:pointer;font-family:var(--font-b);display:flex;align-items:center;justify-content:center;gap:6px;">
+          📤 Envoyer mon rapport au Patron
+        </button>
+        <div id="rapport-envoye-badge" style="display:none;text-align:center;font-size:10px;color:var(--green);background:var(--green-l);padding:3px 8px;border-radius:20px;margin-top:4px;">✓ Rapport envoyé au Patron</div>
+      </div>
     </div>
 
   </div><!-- end app-content -->
@@ -609,7 +617,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.3';
+const APP_VERSION = '5.4';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -1286,13 +1294,25 @@ async function loadPatronRapport(){
     // Filtrer uniquement les encaissements
     const payments = journal.filter(r => r.type === 'PAY');
 
-    // Calculer CA et tickets par serveuse
+    // Calculer CA et tickets par serveuse depuis le journal
     const statsByUser = {};
     payments.forEach(r => {
       const name = r.user || '—';
       if(!statsByUser[name]) statsByUser[name] = {ca:0, tickets:0};
       statsByUser[name].ca += Number(r.amount) || 0;
       statsByUser[name].tickets += 1;
+    });
+
+    // Compléter avec /stats pour les serveuses qui ont envoyé leur résumé
+    const statsRaw = await fbGet('/stats') || {};
+    Object.values(statsRaw).forEach(d => {
+      if(!d.serveur) return;
+      if(!statsByUser[d.serveur]) statsByUser[d.serveur] = {ca: d.ca||0, tickets: d.tickets||0};
+      else {
+        // Prendre le max entre journal et stats pour éviter les doublons
+        statsByUser[d.serveur].ca = Math.max(statsByUser[d.serveur].ca, d.ca||0);
+        statsByUser[d.serveur].tickets = Math.max(statsByUser[d.serveur].tickets, d.tickets||0);
+      }
     });
 
     // Exclure les admins
@@ -1406,6 +1426,47 @@ function switchPatronCfg(tab,btn){
   else if(tab==='menu')renderCfgMenu(c);
   else if(tab==='tables')renderCfgTables(c);
   else if(tab==='system')renderCfgSystem(c);
+}
+
+
+// ══ ENVOI RAPPORT AU PATRON ══
+async function envoyerRapportPatron(){
+  const btn = document.getElementById('btn-envoyer-rapport');
+  const badge = document.getElementById('rapport-envoye-badge');
+  btn.textContent = '⏳ Envoi en cours...';
+  btn.disabled = true;
+
+  try{
+    // Envoyer toutes les entrées du journal local vers Firebase
+    const toSend = S.journal.filter(r => r.user === S.user.name);
+    let sent = 0;
+    for(const entry of toSend){
+      await fbPush('/journal', entry);
+      sent++;
+    }
+
+    // Envoyer aussi un résumé des stats
+    const myPayments = S.journal.filter(r => r.type === 'PAY' && r.user === S.user.name);
+    const myCA = myPayments.reduce((s,r) => s + (Number(r.amount)||0), 0);
+    await fbSet('/stats/' + DEVICE_ID, {
+      serveur: S.user.name,
+      ca: myCA,
+      tickets: myPayments.length,
+      last_sync: fmtT(),
+      ts: Date.now()
+    });
+
+    btn.textContent = '📤 Envoyer mon rapport au Patron';
+    btn.disabled = false;
+    badge.style.display = 'block';
+    toast('✅ Rapport envoyé au Patron (' + sent + ' actions)', 'success');
+    setTimeout(() => { badge.style.display = 'none'; }, 5000);
+
+  }catch(e){
+    btn.textContent = '📤 Envoyer mon rapport au Patron';
+    btn.disabled = false;
+    toast('❌ Erreur — vérifiez votre connexion internet', 'error');
+  }
 }
 
 // ══ BOOT ══

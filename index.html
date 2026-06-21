@@ -609,7 +609,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.2';
+const APP_VERSION = '5.3';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -734,9 +734,7 @@ function log(type,detail,amount=0){
   syncStats();
 }
 async function syncStats(){
-  if(!S.user)return;
-  if(S.user.isAdmin)return; // Patron ne synchronise pas ses stats
-  await fbSet('/stats/'+DEVICE_ID,{serveur:S.user.name,ca:S.dayCA,tickets:S.dayTickets,tables_occupees:TABLES.filter(t=>hasO(t)).length,last_update:fmtT(),ts:Date.now()});
+  // Stats calculées depuis le journal — rien à synchroniser ici
 }
 
 // ══ TAB NAVIGATION ══
@@ -1169,11 +1167,8 @@ async function confirmNouveauJour(){
   TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
   S.activeTable=null;
   save();
-  // Clear ALL Firebase data
-  try{
-    await fbSet('/stats',null);
-    await fbSet('/journal',null);
-  }catch(e){}
+  // Clear journal Firebase
+  try{ await fbSet('/journal', null); }catch(e){}
   toast('🌅 Nouveau jour démarré pour toutes les serveuses !','success');
   // Reload patron journal
   setTimeout(loadPatronJournal, 500);
@@ -1284,62 +1279,122 @@ async function loadPatronDashboard(){
 
 async function loadPatronRapport(){
   try{
-    const stats=await fbGet('/stats')||{};
-    const devices=Object.values(stats).filter(d=>d.serveur&&d.serveur!=='Patron'&&d.ca>0);
-    const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
-    const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
-    const avg=totalTk?Math.round(totalCA/totalTk):0;
-    document.getElementById('patron-kpi-grid').innerHTML=[
-      {v:fmt(totalCA),l:'CA total',c:'var(--amber-d)'},{v:totalTk,l:'Tickets',c:'var(--green)'},
-      {v:fmt(avg),l:'Ticket moyen',c:'var(--teal)'},{v:S.users.filter(u=>!u.isAdmin).length,l:'Serveuses',c:'var(--blue)'}
-    ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
-    // Top articles from journal
-    const journalRaw=await fbGet('/journal')||{};
-    const journal=Object.values(journalRaw);
-    const items={};
-    journal.filter(r=>r.type==='PAY').forEach(r=>{
-      (r.detail||'').replace(/Encaissement[^:]*:/,'').trim().split(', ').forEach(p=>{
-        const m=p.match(/^(\d+)×(.+)$/);if(m)items[m[2].trim()]=(items[m[2].trim()]||0)+parseInt(m[1]);
+    // Charger le journal complet depuis Firebase
+    const journalRaw = await fbGet('/journal') || {};
+    const journal = Object.values(journalRaw);
+
+    // Filtrer uniquement les encaissements
+    const payments = journal.filter(r => r.type === 'PAY');
+
+    // Calculer CA et tickets par serveuse
+    const statsByUser = {};
+    payments.forEach(r => {
+      const name = r.user || '—';
+      if(!statsByUser[name]) statsByUser[name] = {ca:0, tickets:0};
+      statsByUser[name].ca += Number(r.amount) || 0;
+      statsByUser[name].tickets += 1;
+    });
+
+    // Exclure les admins
+    const adminNames = S.users.filter(u => u.isAdmin).map(u => u.name);
+    const serveuses = S.users.filter(u => !u.isAdmin);
+    Object.keys(statsByUser).forEach(name => {
+      if(adminNames.includes(name)) delete statsByUser[name];
+    });
+
+    // Totaux globaux
+    const totalCA = Object.values(statsByUser).reduce((s,d) => s + d.ca, 0);
+    const totalTk = Object.values(statsByUser).reduce((s,d) => s + d.tickets, 0);
+    const avg = totalTk ? Math.round(totalCA / totalTk) : 0;
+
+    // KPIs
+    document.getElementById('patron-kpi-grid').innerHTML = [
+      {v:fmt(totalCA), l:'CA total', c:'var(--amber-d)'},
+      {v:totalTk, l:'Tickets', c:'var(--green)'},
+      {v:fmt(avg), l:'Ticket moyen', c:'var(--teal)'},
+      {v:serveuses.length, l:'Serveuses', c:'var(--blue)'},
+    ].map(k => `<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+
+    // Top articles depuis les encaissements
+    const items = {};
+    payments.forEach(r => {
+      (r.detail || '').replace(/Encaissement[^:]*:/,'').trim().split(', ').forEach(p => {
+        const m = p.match(/^(\d+)×(.+)$/);
+        if(m) items[m[2].trim()] = (items[m[2].trim()] || 0) + parseInt(m[1]);
       });
     });
-    const sorted=Object.entries(items).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    const maxQ=sorted[0]?sorted[0][1]:1;
-    document.getElementById('patron-top-articles').innerHTML=sorted.length?sorted.map(([n,q])=>`
-      <div class="r-row"><div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:600;">${n}</div>
-        <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(q/maxQ*100)}%"></div></div>
-      </div><div class="r-val">${q}</div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucune vente</div>';
-    document.getElementById('patron-by-serveur').innerHTML=devices.length===0
-    ?'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente enregistrée par les serveuses</div>'
-    :devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
-      <div class="r-row">
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:700;">${d.serveur}</div>
-          <div class="r-bar-w"><div class="r-bar" style="width:${devices.length>0?Math.round((d.ca||0)/Math.max(...devices.map(x=>x.ca||0),1)*100):0}%;background:var(--teal);"></div></div>
-        </div>
-        <div style="text-align:right;margin-left:8px;">
-          <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmt(d.ca||0)}</div>
-          <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
-        </div>
-      </div>`).join('');
-  }catch(e){}
+    const sorted = Object.entries(items).sort((a,b) => b[1]-a[1]).slice(0,8);
+    const maxQ = sorted[0] ? sorted[0][1] : 1;
+    document.getElementById('patron-top-articles').innerHTML = sorted.length
+      ? sorted.map(([n,q]) => `<div class="r-row">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:600;">${n}</div>
+            <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(q/maxQ*100)}%"></div></div>
+          </div>
+          <div class="r-val">${q}</div>
+        </div>`).join('')
+      : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente</div>';
+
+    // Ventes par serveuse — toutes affichées même à 0F
+    const maxCA = Math.max(...serveuses.map(u => (statsByUser[u.name]||{ca:0}).ca), 1);
+    document.getElementById('patron-by-serveur').innerHTML = serveuses
+      .sort((a,b) => ((statsByUser[b.name]||{ca:0}).ca) - ((statsByUser[a.name]||{ca:0}).ca))
+      .map(u => {
+        const d = statsByUser[u.name] || {ca:0, tickets:0};
+        return `<div class="r-row">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div>
+            <div style="font-size:10px;color:var(--muted);">${d.tickets} ticket(s)</div>
+            <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(d.ca/maxCA*100)}%;background:var(--teal);"></div></div>
+          </div>
+          <div class="r-val" style="margin-left:10px;">${fmt(d.ca)}</div>
+        </div>`;
+      }).join('');
+
+  } catch(e) {
+    document.getElementById('patron-kpi-grid').innerHTML = '<div style="color:var(--red);padding:20px;">❌ Erreur de connexion Firebase</div>';
+  }
 }
 
 async function exportPatronRapport(){
-  let allEntries=[];
-  try{const raw=await fbGet('/journal');if(raw)allEntries=Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));}catch(e){}
-  const stats=await fbGet('/stats').catch(()=>({}));
-  const devices=stats?Object.values(stats).filter(d=>d.serveur):[];
-  const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
-  const lines=['RAPPORT GÉRANT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),
-    'Tél: 01 69 72 94 71','='.repeat(50),
-    'CA Total (toutes serveuses): '+fmt(totalCA),
-    ...devices.map(d=>'  '+d.serveur+': '+fmt(d.ca||0)+' ('+( d.tickets||0)+' tickets)'),
-    '','JOURNAL COMPLET:','-'.repeat(40),
-    ...allEntries.map(r=>`[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)
+  let journal = [];
+  try{
+    const raw = await fbGet('/journal');
+    if(raw) journal = Object.values(raw).sort((a,b) => (b.ts||0)-(a.ts||0));
+  }catch(e){}
+
+  const payments = journal.filter(r => r.type === 'PAY');
+  const adminNames = S.users.filter(u => u.isAdmin).map(u => u.name);
+  const statsByUser = {};
+  payments.forEach(r => {
+    const name = r.user || '—';
+    if(adminNames.includes(name)) return;
+    if(!statsByUser[name]) statsByUser[name] = {ca:0, tickets:0};
+    statsByUser[name].ca += Number(r.amount) || 0;
+    statsByUser[name].tickets += 1;
+  });
+  const totalCA = Object.values(statsByUser).reduce((s,d) => s+d.ca, 0);
+
+  const lines = [
+    'RAPPORT GÉRANT — Terrasse Resto CHEZ DJADJA — ' + new Date().toLocaleDateString('fr-FR'),
+    'Tél: 01 69 72 94 71',
+    '='.repeat(50),
+    'CA Total: ' + fmt(totalCA),
+    '',
+    'PAR SERVEUSE:',
+    ...S.users.filter(u=>!u.isAdmin).map(u => {
+      const d = statsByUser[u.name] || {ca:0, tickets:0};
+      return '  ' + u.name + ': ' + fmt(d.ca) + ' (' + d.tickets + ' tickets)';
+    }),
+    '',
+    'JOURNAL COMPLET:',
+    '-'.repeat(40),
+    ...journal.map(r => `[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)
   ];
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
-  a.download='rapport_gerant_'+new Date().toISOString().slice(0,10)+'.txt';a.click();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/plain'}));
+  a.download = 'rapport_gerant_' + new Date().toISOString().slice(0,10) + '.txt';
+  a.click();
 }
 
 function switchPatronCfg(tab,btn){

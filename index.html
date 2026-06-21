@@ -361,6 +361,7 @@ select.form-input{cursor:pointer;}
     <div class="tab-panel active" id="tab-tables">
       <div class="tables-header">
         <h2>🪑 Tables</h2>
+        <button onclick="confirmNouveauJourServeuse()" style="background:var(--green-l);border:1px solid var(--green);color:var(--green);padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">🌅 Nouveau jour</button>
         
         <div class="tables-stats">
           <div class="ts-item"><span class="ts-val" id="s-ca">0 F</span><span class="ts-lbl">CA jour</span></div>
@@ -451,7 +452,7 @@ select.form-input{cursor:pointer;}
       <span id="patron-user-name"></span>
     </div>
     <div style="font-size:10px;font-family:monospace;color:rgba(255,255,255,.5);" id="patron-time"></div>
-    <button onclick="confirmNouveauJour()" style="background:rgba(59,109,17,.3);border:1px solid rgba(59,109,17,.5);color:#a8d17a;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">🌅 Nouveau jour</button>
+    
     <button onclick="logoutPatron()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">⬅ Quitter</button>
   </div>
 
@@ -617,7 +618,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.5';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -1467,6 +1468,20 @@ async function envoyerRapportPatron(){
     btn.disabled = false;
     toast('❌ Erreur — vérifiez votre connexion internet', 'error');
   }
+}
+
+
+function confirmNouveauJourServeuse(){
+  if(!confirm('Démarrer un nouveau jour ?\nCela va effacer toutes vos commandes et données locales.'))return;
+  // Reset local data only
+  S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};
+  TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
+  S.activeTable=null;
+  save();
+  renderTables();renderStats();renderOrder();updateNavBadges();
+  // Also clear this device's stats from Firebase
+  try{fbSet('/stats/'+DEVICE_ID, null);}catch(e){}
+  toast('🌅 Nouveau jour démarré !','success');
 }
 
 // ══ BOOT ══

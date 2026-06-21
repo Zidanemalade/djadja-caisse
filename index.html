@@ -449,7 +449,7 @@ select.form-input{cursor:pointer;}
 
   <div class="patron-nav">
     <button class="patron-nav-btn active" onclick="switchPatronTab('journal',this)">📋 Journal</button>
-    <button class="patron-nav-btn" onclick="switchPatronTab('dashboard',this)">👁️ Tableau de bord</button>
+    
     <button class="patron-nav-btn" onclick="switchPatronTab('rapport',this)">📊 Rapport</button>
     <button class="patron-nav-btn" onclick="switchPatronTab('config',this)">⚙️ Configuration</button>
   </div>
@@ -472,15 +472,6 @@ select.form-input{cursor:pointer;}
       <tbody id="patron-journal-body"></tbody></table>
     </div>
 
-    <!-- DASHBOARD PATRON -->
-    <div class="patron-panel" id="patron-panel-dashboard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="font-family:var(--font-d);font-size:18px;font-weight:700;"><span class="live-dot"></span>En direct</div>
-        <button onclick="loadPatronDashboard()" style="background:var(--amber);border:none;color:#fff;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:800;cursor:pointer;font-family:var(--font-b);">🔄 Actualiser</button>
-      </div>
-      <div id="patron-dashboard-content"><div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div></div>
-    </div>
-
     <!-- RAPPORT PATRON -->
     <div class="patron-panel" id="patron-panel-rapport">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -489,7 +480,7 @@ select.form-input{cursor:pointer;}
       </div>
       <div class="patron-kpi-grid" id="patron-kpi-grid"></div>
       <div class="r-block"><h3>Top articles</h3><div id="patron-top-articles"></div></div>
-      <div class="r-block" style="margin-top:12px;"><h3>Par serveuse</h3><div id="patron-by-serveur"></div></div>
+      <div class="r-block" style="margin-top:12px;"><h3>Ventes par serveuse</h3><div id="patron-by-serveur"></div></div>
     </div>
 
     <!-- CONFIG PATRON -->
@@ -618,7 +609,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.1';
+const APP_VERSION = '5.2';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -744,6 +735,7 @@ function log(type,detail,amount=0){
 }
 async function syncStats(){
   if(!S.user)return;
+  if(S.user.isAdmin)return; // Patron ne synchronise pas ses stats
   await fbSet('/stats/'+DEVICE_ID,{serveur:S.user.name,ca:S.dayCA,tickets:S.dayTickets,tables_occupees:TABLES.filter(t=>hasO(t)).length,last_update:fmtT(),ts:Date.now()});
 }
 
@@ -1212,7 +1204,7 @@ function switchPatronTab(tab,btn){
   document.querySelectorAll('.patron-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('patron-panel-'+tab).classList.add('active');
   if(tab==='journal')loadPatronJournal();
-  if(tab==='dashboard')loadPatronDashboard();
+
   if(tab==='rapport')loadPatronRapport();
   if(tab==='config'){switchPatronCfg(patronCfgTab);}
 }
@@ -1250,7 +1242,8 @@ async function loadPatronDashboard(){
   try{
     const stats=await fbGet('/stats')||{};
     const journalRaw=await fbGet('/journal')||{};
-    const devices=Object.values(stats).filter(d=>d.serveur);
+    const adminNames=S.users.filter(u=>u.isAdmin).map(u=>u.name);
+    const devices=Object.values(stats).filter(d=>d.serveur&&!adminNames.includes(d.serveur));
     const journal=Object.values(journalRaw).sort((a,b)=>(b.ts||0)-(a.ts||0));
     const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
     const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
@@ -1292,13 +1285,13 @@ async function loadPatronDashboard(){
 async function loadPatronRapport(){
   try{
     const stats=await fbGet('/stats')||{};
-    const devices=Object.values(stats).filter(d=>d.serveur);
+    const devices=Object.values(stats).filter(d=>d.serveur&&d.serveur!=='Patron'&&d.ca>0);
     const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
     const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
     const avg=totalTk?Math.round(totalCA/totalTk):0;
     document.getElementById('patron-kpi-grid').innerHTML=[
       {v:fmt(totalCA),l:'CA total',c:'var(--amber-d)'},{v:totalTk,l:'Tickets',c:'var(--green)'},
-      {v:fmt(avg),l:'Ticket moyen',c:'var(--teal)'},{v:devices.length,l:'Serveuses actives',c:'var(--blue)'}
+      {v:fmt(avg),l:'Ticket moyen',c:'var(--teal)'},{v:S.users.filter(u=>!u.isAdmin).length,l:'Serveuses',c:'var(--blue)'}
     ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
     // Top articles from journal
     const journalRaw=await fbGet('/journal')||{};
@@ -1316,10 +1309,18 @@ async function loadPatronRapport(){
         <div style="font-size:12px;font-weight:600;">${n}</div>
         <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(q/maxQ*100)}%"></div></div>
       </div><div class="r-val">${q}</div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;">Aucune vente</div>';
-    document.getElementById('patron-by-serveur').innerHTML=devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
+    document.getElementById('patron-by-serveur').innerHTML=devices.length===0
+    ?'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente enregistrée par les serveuses</div>'
+    :devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
       <div class="r-row">
-        <div style="flex:1;"><div style="font-size:12px;font-weight:600;">${d.serveur}</div></div>
-        <div class="r-val">${fmt(d.ca||0)}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${d.serveur}</div>
+          <div class="r-bar-w"><div class="r-bar" style="width:${devices.length>0?Math.round((d.ca||0)/Math.max(...devices.map(x=>x.ca||0),1)*100):0}%;background:var(--teal);"></div></div>
+        </div>
+        <div style="text-align:right;margin-left:8px;">
+          <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmt(d.ca||0)}</div>
+          <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
+        </div>
       </div>`).join('');
   }catch(e){}
 }

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Terrasse Resto CHEZ DJADJA</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -21,10 +21,10 @@
   --font-b:'Inter',system-ui,sans-serif;
   --topbar:48px;--bottomnav:80px;
 }
-body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
+body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100vh;height:100dvh;overflow:hidden;}
 
 /* ══ PATRON MODE ══ */
-#patron-app{display:none;height:100vh;flex-direction:column;}
+#patron-app{display:none;height:100vh;height:100dvh;flex-direction:column;}
 #patron-app.visible{display:flex;}
 .patron-topbar{display:flex;align-items:center;gap:8px;padding:0 14px;height:var(--topbar);background:linear-gradient(90deg,#1a0e05,#2d1a07);color:#fff;flex-shrink:0;border-bottom:1px solid rgba(201,150,42,.2);}
 .patron-topbar .tl1{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#C9962A;opacity:.8;}
@@ -39,7 +39,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
 /* ══ SPLASH ══ */
-#splash-screen{position:fixed;inset:0;z-index:1500;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;}
+#splash-screen{position:fixed;inset:0;z-index:1500;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px);}
 #splash-screen.show{display:flex;}
 .splash-bg{position:absolute;inset:0;background:linear-gradient(160deg,#0d0702 0%,#1a0e05 40%,#291508 70%,#1a0e05 100%);}
 .splash-glow{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background:radial-gradient(circle,rgba(201,150,42,.15) 0%,transparent 70%);pointer-events:none;}
@@ -87,7 +87,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .pin-back{margin-top:12px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);padding:7px 18px;border-radius:8px;cursor:pointer;font-size:12px;font-family:var(--font-b);}
 
 /* ══ APP ══ */
-#app{display:none;height:100vh;flex-direction:column;}
+#app{display:none;height:100vh;height:100dvh;flex-direction:column;}
 #app.visible{display:flex;}
 
 /* TOPBAR */
@@ -184,7 +184,14 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .warn-badge{font-size:10px;color:var(--amber-d);background:var(--amber-l);padding:2px 8px;border-radius:20px;text-align:center;margin-bottom:3px;}
 
 /* ══ BOTTOM NAV ══ */
-.bottom-nav{display:flex;background:var(--card);border-top:1px solid var(--border);height:var(--bottomnav);flex-shrink:0;padding-bottom:env(safe-area-inset-bottom, 16px);}
+.bottom-nav{
+  display:flex;
+  background:var(--card);
+  border-top:1px solid var(--border);
+  height:calc(var(--bottomnav) + env(safe-area-inset-bottom, 0px));
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  flex-shrink:0;
+}
 .bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;position:relative;}
 .bnav-btn.active{color:var(--amber-d);}
 .bnav-btn.active .bnav-icon{background:var(--amber-l);}
@@ -297,7 +304,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .pay-method.selected{border-color:var(--amber);background:var(--amber-l);}
 .pm-icon{font-size:20px;margin-bottom:4px;}
 .pm-label{font-size:12px;font-weight:700;}
-.toast{position:fixed;bottom:calc(var(--bottomnav) + 16px);left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:var(--rs);font-size:12px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:2000;white-space:nowrap;font-family:var(--font-b);}
+.toast{position:fixed;bottom:calc(var(--bottomnav) + env(safe-area-inset-bottom, 0px) + 16px);left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:var(--rs);font-size:12px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:2000;white-space:nowrap;font-family:var(--font-b);}
 .toast.show{opacity:1;}
 .toast.success{background:var(--green-l);color:var(--green);border:1px solid #a8d17a;}
 .toast.warn{background:var(--amber-l);color:var(--amber-d);border:1px solid var(--amber-m);}
@@ -618,7 +625,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.5';
+const APP_VERSION = '5.6';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){

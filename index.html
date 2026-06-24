@@ -19,7 +19,7 @@
   --r:10px;--rs:7px;
   --font-d:'Playfair Display',Georgia,serif;
   --font-b:'Inter',system-ui,sans-serif;
-  --topbar:48px;--bottomnav:80px;
+  --topbar:48px;--bottomnav:90px;--safe-bottom:20px;
 }
 body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100vh;height:100dvh;overflow:hidden;}
 
@@ -87,7 +87,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .pin-back{margin-top:12px;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);padding:7px 18px;border-radius:8px;cursor:pointer;font-size:12px;font-family:var(--font-b);}
 
 /* ══ APP ══ */
-#app{display:none;height:100vh;height:100dvh;flex-direction:column;}
+#app{display:none;height:100vh;height:100dvh;flex-direction:column;overflow:hidden;}
 #app.visible{display:flex;}
 
 /* TOPBAR */
@@ -102,10 +102,10 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .tb-btn:hover{background:rgba(201,150,42,.2);}
 
 /* MAIN CONTENT */
-.app-content{flex:1;overflow:hidden;position:relative;}
+.app-content{flex:1;overflow:hidden;position:relative;min-height:0;}
 
 /* ══ TAB PANELS ══ */
-.tab-panel{display:none;position:absolute;inset:0;overflow-y:auto;}
+.tab-panel{display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .tab-panel.active{display:block;}
 
 /* TABLES TAB */
@@ -187,16 +187,20 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .bottom-nav{
   display:flex;
   background:var(--card);
-  border-top:1px solid var(--border);
-  height:calc(var(--bottomnav) + env(safe-area-inset-bottom, 0px));
-  padding-bottom:env(safe-area-inset-bottom, 0px);
+  border-top:2px solid var(--border);
+  min-height:var(--bottomnav);
+  padding-bottom:max(env(safe-area-inset-bottom, 0px), var(--safe-bottom));
   flex-shrink:0;
+  position:sticky;
+  bottom:0;
+  z-index:100;
+  box-shadow:0 -2px 10px rgba(0,0,0,.08);
 }
-.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;position:relative;}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;position:relative;padding:8px 0 4px;}
 .bnav-btn.active{color:var(--amber-d);}
 .bnav-btn.active .bnav-icon{background:var(--amber-l);}
-.bnav-icon{font-size:22px;width:44px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:14px;transition:all .15s;}
-.bnav-label{font-size:10px;font-weight:700;letter-spacing:.02em;}
+.bnav-icon{font-size:24px;width:48px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:14px;transition:all .15s;}
+.bnav-label{font-size:11px;font-weight:700;letter-spacing:.02em;}
 .bnav-badge{position:absolute;top:6px;right:calc(50% - 28px);background:var(--amber);color:#fff;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
 
 /* ══ CONFIRMATION CLIENT ══ */
@@ -304,7 +308,7 @@ body{font-family:var(--font-b);background:var(--bg);color:var(--text);height:100
 .pay-method.selected{border-color:var(--amber);background:var(--amber-l);}
 .pm-icon{font-size:20px;margin-bottom:4px;}
 .pm-label{font-size:12px;font-weight:700;}
-.toast{position:fixed;bottom:calc(var(--bottomnav) + env(safe-area-inset-bottom, 0px) + 16px);left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:var(--rs);font-size:12px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:2000;white-space:nowrap;font-family:var(--font-b);}
+.toast{position:fixed;bottom:calc(var(--bottomnav) + max(env(safe-area-inset-bottom, 0px), var(--safe-bottom)) + 10px);left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:var(--rs);font-size:12px;font-weight:700;opacity:0;transition:opacity .3s;pointer-events:none;z-index:2000;white-space:nowrap;font-family:var(--font-b);}
 .toast.show{opacity:1;}
 .toast.success{background:var(--green-l);color:var(--green);border:1px solid #a8d17a;}
 .toast.warn{background:var(--amber-l);color:var(--amber-d);border:1px solid var(--amber-m);}
@@ -460,6 +464,7 @@ select.form-input{cursor:pointer;}
     </div>
     <div style="font-size:10px;font-family:monospace;color:rgba(255,255,255,.5);" id="patron-time"></div>
     
+    <button onclick="confirmNouveauJour()" style="background:rgba(59,109,17,.3);border:1px solid rgba(59,109,17,.5);color:#a8d17a;padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">🌅 Nouveau jour</button>
     <button onclick="logoutPatron()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.8);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--font-b);">⬅ Quitter</button>
   </div>
 
@@ -625,7 +630,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.6';
+const APP_VERSION = '5.8';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -1177,17 +1182,26 @@ function renderCfgTables(c){c.innerHTML=`<div class="cfg-hd"><h2>🪑 Tables</h2
 function applyTableCount(){const n=parseInt(document.getElementById('table-range').value);if(!confirm('Changer à '+n+' tables ?'))return;S.tableCount=n;initTables();save();renderTables();renderStats();renderCfgTables(document.getElementById('cfg-content'));toast('✓ '+n+' tables','success');}
 function renderCfgSystem(c){c.innerHTML=`<div class="cfg-hd"><h2>🔧 Système</h2></div><div class="cfg-section"><div class="cfg-section-hd">Données du jour</div><div style="padding:14px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:13px;color:var(--muted);">CA : <strong style="color:var(--amber-d);">${fmt(S.dayCA)}</strong> · Tickets : <strong>${S.dayTickets}</strong></div><button class="cfg-btn edit" onclick="exportRapport()">⬇ Exporter le rapport</button><button class="cfg-btn del" onclick="resetDay()">🔄 Réinitialiser le jour</button></div></div><div class="cfg-section"><div class="cfg-section-hd">Remise à zéro</div><div style="padding:14px;"><button class="cfg-btn del" onclick="fullReset()">⛔ Tout effacer</button></div></div>`;}
 async function confirmNouveauJour(){
-  if(!confirm('Démarrer un nouveau jour ?\nCela efface le CA, les tickets, les commandes et les données de toutes les serveuses.'))return;
-  // Reset local data
+  if(!confirm('Démarrer un nouveau jour ?\nCela efface le journal, le rapport et toutes les données Firebase.'))return;
+
+  // 1. Reset données locales du patron
   S.dayCA=0;S.dayTickets=0;S.journal=[];S.paySales={cash:0,mobile:0};
   TABLES.forEach(t=>{t.rounds=[];t.currentRound=0;});
   S.activeTable=null;
   save();
-  // Clear journal Firebase
-  try{ await fbSet('/journal', null); }catch(e){}
-  toast('🌅 Nouveau jour démarré pour toutes les serveuses !','success');
-  // Reload patron journal
-  setTimeout(loadPatronJournal, 500);
+
+  // 2. Effacer TOUT Firebase
+  try{
+    await fbSet('/journal', null);
+    await fbSet('/stats', null);
+  }catch(e){}
+
+  // 3. Recharger le journal et rapport (vides)
+  toast('🌅 Nouveau jour démarré !','success');
+  setTimeout(()=>{
+    loadPatronJournal();
+    loadPatronRapport();
+  }, 500);
 }
 
 function resetDay(){
@@ -1336,6 +1350,24 @@ async function loadPatronRapport(){
     const avg = totalTk ? Math.round(totalCA / totalTk) : 0;
 
     // KPIs
+    // Afficher état vide proprement si aucune donnée
+    if(payments.length === 0 && Object.keys(statsByUser).length === 0){
+      document.getElementById('patron-kpi-grid').innerHTML = [
+        {v:'0 F', l:'CA total', c:'var(--amber-d)'},
+        {v:'0', l:'Tickets', c:'var(--green)'},
+        {v:'0 F', l:'Ticket moyen', c:'var(--teal)'},
+        {v:S.users.filter(u=>!u.isAdmin).length, l:'Serveuses', c:'var(--blue)'},
+      ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+      document.getElementById('patron-top-articles').innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente — nouveau jour démarré</div>';
+      const serveuses=S.users.filter(u=>!u.isAdmin);
+      document.getElementById('patron-by-serveur').innerHTML=serveuses.map(u=>`
+        <div class="r-row">
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div><div style="font-size:10px;color:var(--muted);">0 ticket(s)</div></div>
+          <div class="r-val">0 F</div>
+        </div>`).join('');
+      return;
+    }
+
     document.getElementById('patron-kpi-grid').innerHTML = [
       {v:fmt(totalCA), l:'CA total', c:'var(--amber-d)'},
       {v:totalTk, l:'Tickets', c:'var(--green)'},

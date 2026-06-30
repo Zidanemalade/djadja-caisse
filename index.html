@@ -630,7 +630,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -1102,63 +1102,22 @@ function renderRapport(){
     <div class="r-val">${fmt(v)}</div></div>`).join(''):'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucun encaissement</div>';
 }
 async function exportRapport(){
-  let fbJournal = [];
-  try{
-    const raw = await fbGet('/journal');
-    if(raw) fbJournal = Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));
-  }catch(e){}
-  const allEntries = fbJournal.length > S.journal.length ? fbJournal : S.journal;
-  const totalCA_fb = await fbGet('/stats').then(s=>s?Object.values(s).reduce((t,d)=>t+(d.ca||0),0):S.dayCA).catch(()=>S.dayCA);
-  
-  const lines=['RAPPORT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),'Tél: 01 69 72 94 71','='.repeat(40),'CA Total (toutes serveuses): '+fmt(totalCA_fb),'CA Local: '+fmt(S.dayCA),'Tickets: '+S.dayTickets,'','JOURNAL COMPLET:','-'.repeat(40),...allEntries.map(r=>`[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)];  
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));a.download='rapport_djadja_'+new Date().toISOString().slice(0,10)+'.txt';a.click();
+  const lines = [
+    'RAPPORT — Terrasse Resto CHEZ DJADJA — '+new Date().toLocaleDateString('fr-FR'),
+    'Tél: 01 69 72 94 71','='.repeat(40),
+    'Serveuse: '+S.user.name,
+    'CA: '+fmt(S.dayCA),'Tickets: '+S.dayTickets,'',
+    'JOURNAL LOCAL:','-'.repeat(40),
+    ...S.journal.map(r=>`[${r.time}] ${r.type} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)
+  ];
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain'}));
+  a.download='rapport_'+S.user.name+'_'+new Date().toISOString().slice(0,10)+'.txt';
+  a.click();
 }
 
 // ══ DASHBOARD ══
-function showDashboard(){showView('dashboard');}
-async function loadDashboard(){
-  const content=document.getElementById('dashboard-content');
-  content.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div>';
-  try{
-    const stats=await fbGet('/stats')||{};
-    const journalRaw=await fbGet('/journal')||{};
-    const devices=Object.values(stats);
-    const journal=Object.values(journalRaw).sort((a,b)=>(b.ts||0)-(a.ts||0));
-    const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
-    const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
-    const lbl={ADD:'Ajout',REMOVE:'Suppression',PAY:'Encaissement',SEND:'Cuisine',LOGIN:'Connexion',CONFIRM:'Confirmation',ROUND:'Round'};
-    const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
-    content.innerHTML=`
-    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
-      <div class="kpi"><div class="kpi-v" style="color:var(--amber-d);">${fmt(totalCA)}</div><div class="kpi-l">CA combiné</div></div>
-      <div class="kpi" style="border-color:var(--green);"><div class="kpi-v" style="color:var(--green);">${totalTk}</div><div class="kpi-l">Tickets total</div></div>
-      <div class="kpi" style="border-color:var(--blue);"><div class="kpi-v" style="color:var(--blue);">${devices.length}</div><div class="kpi-l">Actives</div></div>
-    </div>
-    <div class="r-block"><h3>Par serveuse</h3>
-      ${devices.length===0?'<div style="color:var(--muted);font-size:12px;">Aucune serveuse connectée</div>':
-        devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
-        <div class="r-row"><div style="flex:1;">
-          <div style="font-size:13px;font-weight:700;">${d.serveur||'—'}</div>
-          <div style="font-size:10px;color:var(--muted);">${d.tables_occupees||0} table(s) · ${d.last_update||'—'}</div>
-        </div><div style="text-align:right;">
-          <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmt(d.ca||0)}</div>
-          <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
-        </div></div>`).join('')}
-    </div>
-    <div class="r-block"><h3>Dernières actions</h3>
-      ${journal.length===0?'<div style="color:var(--muted);font-size:12px;">Aucune action</div>':
-        journal.slice(0,20).map(r=>`
-        <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
-          <span class="jbadge ${cls[r.type]||'j-ADD'}">${lbl[r.type]||r.type}</span>
-          <span style="font-weight:700;white-space:nowrap;">${r.user||'—'}</span>
-          <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${r.detail||''}</span>
-          <span style="color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap;">${r.time||''}</span>
-        </div>`).join('')}
-    </div>`;
-  }catch(e){
-    content.innerHTML=`<div style="text-align:center;padding:40px;"><div style="color:var(--red);font-size:16px;margin-bottom:10px;">❌ Erreur de connexion</div><div style="color:var(--muted);font-size:13px;">Vérifiez votre connexion internet.</div></div>`;
-  }
-}
+// Dashboard supprimé — données via rapports uniquement
 
 // ══ CONFIG ══
 function showConfig(){hideViews();document.getElementById('view-config').classList.add('visible');renderCfgTab(cfgTab);}
@@ -1244,14 +1203,11 @@ async function loadPatronJournal(){
   const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
   let entries=[];
   try{
-    // Lire les journaux depuis /rapports
     const rapportsRaw = await fbGet('/rapports') || {};
     const rapports = Object.values(rapportsRaw);
-    rapports.forEach(r => {
-      (r.journal||[]).forEach(e => entries.push(e));
-    });
-    entries.sort((a,b) => (b.ts||0)-(a.ts||0));
-    if(entries.length === 0) entries = [...S.journal];
+    rapports.forEach(r => { (r.journal||[]).forEach(e => entries.push(e)); });
+    entries.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    if(entries.length===0) entries=[...S.journal];
   }catch(e){entries=[...S.journal];}
   if(patronJournalFilter!=='all')entries=entries.filter(r=>r.type===patronJournalFilter);
   document.getElementById('patron-journal-count').textContent=entries.length+' entrées';
@@ -1266,47 +1222,44 @@ async function loadPatronJournal(){
 
 async function loadPatronDashboard(){
   const content=document.getElementById('patron-dashboard-content');
+  if(!content)return;
   content.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);">⏳ Chargement...</div>';
   try{
-    const stats=await fbGet('/stats')||{};
-    const journalRaw=await fbGet('/journal')||{};
+    const rapportsRaw=await fbGet('/rapports')||{};
+    const rapports=Object.values(rapportsRaw);
     const adminNames=S.users.filter(u=>u.isAdmin).map(u=>u.name);
-    const devices=Object.values(stats).filter(d=>d.serveur&&!adminNames.includes(d.serveur));
-    const journal=Object.values(journalRaw).sort((a,b)=>(b.ts||0)-(a.ts||0));
-    const totalCA=devices.reduce((s,d)=>s+(d.ca||0),0);
-    const totalTk=devices.reduce((s,d)=>s+(d.tickets||0),0);
+    const serveuses=S.users.filter(u=>!u.isAdmin);
+    const rapportMap={};rapports.forEach(r=>{if(!adminNames.includes(r.serveur))rapportMap[r.serveur]=r;});
+    const totalCA=Object.values(rapportMap).reduce((s,r)=>s+(r.ca||0),0);
+    const totalTk=Object.values(rapportMap).reduce((s,r)=>s+(r.tickets||0),0);
     const lbl={ADD:'Ajout',REMOVE:'Suppression',PAY:'Encaissement',SEND:'Cuisine',LOGIN:'Connexion',CONFIRM:'Confirmation',ROUND:'Round'};
     const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
+    const allJournal=rapports.flatMap(r=>r.journal||[]).sort((a,b)=>(b.ts||0)-(a.ts||0));
     content.innerHTML=`
     <div class="patron-kpi-grid" style="margin-bottom:14px;">
       <div class="kpi"><div class="kpi-v" style="color:var(--amber-d);">${fmt(totalCA)}</div><div class="kpi-l">CA combiné</div></div>
       <div class="kpi" style="border-color:var(--green);"><div class="kpi-v" style="color:var(--green);">${totalTk}</div><div class="kpi-l">Tickets total</div></div>
     </div>
     <div class="r-block" style="margin-bottom:12px;"><h3>Par serveuse</h3>
-      ${devices.length===0?'<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune serveuse active</div>':
-        devices.sort((a,b)=>(b.ca||0)-(a.ca||0)).map(d=>`
+      ${serveuses.map(u=>{const r=rapportMap[u.name];return`
         <div class="r-row">
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;">${d.serveur}</div>
-            <div style="font-size:10px;color:var(--muted);">${d.tables_occupees||0} table(s) · ${d.last_update||'—'}</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:13px;font-weight:800;color:var(--amber-d);">${fmt(d.ca||0)}</div>
-            <div style="font-size:10px;color:var(--muted);">${d.tickets||0} ticket(s)</div>
-          </div>
-        </div>`).join('')}
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div>
+          <div style="font-size:10px;color:var(--muted);">${r?r.tickets+' ticket(s) · '+r.heure_envoi:'En attente du rapport'}</div></div>
+          <div class="r-val">${r?fmt(r.ca||0):'—'}</div>
+        </div>`}).join('')}
     </div>
     <div class="r-block"><h3>Dernières actions</h3>
-      ${journal.slice(0,20).map(r=>`
-      <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
-        <span class="jbadge ${cls[r.type]||'j-ADD'}">${lbl[r.type]||r.type}</span>
-        <span style="font-weight:700;white-space:nowrap;">${r.user||'—'}</span>
-        <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${r.detail||''}</span>
-        <span style="color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap;">${r.time||''}</span>
-      </div>`).join('')}
+      ${allJournal.length===0?'<div style="color:var(--muted);font-size:12px;">Aucun rapport reçu</div>':
+        allJournal.slice(0,20).map(r=>`
+        <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;">
+          <span class="jbadge ${cls[r.type]||'j-ADD'}">${lbl[r.type]||r.type}</span>
+          <span style="font-weight:700;white-space:nowrap;">${r.user||'—'}</span>
+          <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${r.detail||''}</span>
+          <span style="color:var(--muted);font-family:monospace;font-size:10px;white-space:nowrap;">${r.time||''}</span>
+        </div>`).join('')}
     </div>`;
   }catch(e){
-    content.innerHTML='<div style="text-align:center;padding:40px;color:var(--red);">❌ Erreur de connexion. Vérifiez internet.</div>';
+    content.innerHTML='<div style="text-align:center;padding:40px;color:var(--red);">❌ Erreur de connexion</div>';
   }
 }
 
@@ -1404,8 +1357,7 @@ function confirmNouveauJourServeuse(){
   S.activeTable=null;
   save();
   renderTables();renderStats();renderOrder();updateNavBadges();
-  // Also clear this device's stats from Firebase
-  try{fbSet('/stats/'+DEVICE_ID, null);}catch(e){}
+  // Pas de nettoyage Firebase côté serveuse — le Patron gère ça
   toast('🌅 Nouveau jour démarré !','success');
 }
 

@@ -630,7 +630,7 @@ select.form-input{cursor:pointer;}
 
 <script>
 // ══ VERSION ══
-const APP_VERSION = '5.8';
+const APP_VERSION = '6.0';
 (function(){
   const saved = localStorage.getItem('tpos_version');
   if(saved !== APP_VERSION){
@@ -751,12 +751,10 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 function log(type,detail,amount=0){
   const e={time:fmtT(),type,user:S.user?S.user.name:'—',table:S.activeTable||'—',detail,amount,date:new Date().toLocaleDateString('fr-FR')};
   S.journal.unshift(e);
-  fbPush('/journal',e);
-  syncStats();
+  // Pas d'envoi temps réel — tout se fait via "Envoyer mon rapport" en fin de service
+  save();
 }
-async function syncStats(){
-  // Stats calculées depuis le journal — rien à synchroniser ici
-}
+// syncStats supprimé — données envoyées uniquement en fin de service
 
 // ══ TAB NAVIGATION ══
 function switchTab(tab){
@@ -1192,7 +1190,7 @@ async function confirmNouveauJour(){
 
   // 2. Effacer TOUT Firebase
   try{
-    await fbSet('/journal', null);
+    await fbSet('/rapports', null);
     await fbSet('/stats', null);
   }catch(e){}
 
@@ -1246,9 +1244,14 @@ async function loadPatronJournal(){
   const cls={ADD:'j-ADD',REMOVE:'j-REMOVE',PAY:'j-PAY',SEND:'j-SEND',CONFIRM:'j-CONFIRM',ROUND:'j-ROUND'};
   let entries=[];
   try{
-    const raw=await fbGet('/journal');
-    if(raw)entries=Object.values(raw).sort((a,b)=>(b.ts||0)-(a.ts||0));
-    else entries=[...S.journal];
+    // Lire les journaux depuis /rapports
+    const rapportsRaw = await fbGet('/rapports') || {};
+    const rapports = Object.values(rapportsRaw);
+    rapports.forEach(r => {
+      (r.journal||[]).forEach(e => entries.push(e));
+    });
+    entries.sort((a,b) => (b.ts||0)-(a.ts||0));
+    if(entries.length === 0) entries = [...S.journal];
   }catch(e){entries=[...S.journal];}
   if(patronJournalFilter!=='all')entries=entries.filter(r=>r.type===patronJournalFilter);
   document.getElementById('patron-journal-count').textContent=entries.length+' entrées';
@@ -1309,81 +1312,54 @@ async function loadPatronDashboard(){
 
 async function loadPatronRapport(){
   try{
-    // Charger le journal complet depuis Firebase
-    const journalRaw = await fbGet('/journal') || {};
-    const journal = Object.values(journalRaw);
-
-    // Filtrer uniquement les encaissements
-    const payments = journal.filter(r => r.type === 'PAY');
-
-    // Calculer CA et tickets par serveuse depuis le journal
-    const statsByUser = {};
-    payments.forEach(r => {
-      const name = r.user || '—';
-      if(!statsByUser[name]) statsByUser[name] = {ca:0, tickets:0};
-      statsByUser[name].ca += Number(r.amount) || 0;
-      statsByUser[name].tickets += 1;
-    });
-
-    // Compléter avec /stats pour les serveuses qui ont envoyé leur résumé
-    const statsRaw = await fbGet('/stats') || {};
-    Object.values(statsRaw).forEach(d => {
-      if(!d.serveur) return;
-      if(!statsByUser[d.serveur]) statsByUser[d.serveur] = {ca: d.ca||0, tickets: d.tickets||0};
-      else {
-        // Prendre le max entre journal et stats pour éviter les doublons
-        statsByUser[d.serveur].ca = Math.max(statsByUser[d.serveur].ca, d.ca||0);
-        statsByUser[d.serveur].tickets = Math.max(statsByUser[d.serveur].tickets, d.tickets||0);
-      }
-    });
+    // Lire les rapports envoyés par chaque serveuse
+    const rapportsRaw = await fbGet('/rapports') || {};
+    const rapports = Object.values(rapportsRaw);
 
     // Exclure les admins
     const adminNames = S.users.filter(u => u.isAdmin).map(u => u.name);
     const serveuses = S.users.filter(u => !u.isAdmin);
-    Object.keys(statsByUser).forEach(name => {
-      if(adminNames.includes(name)) delete statsByUser[name];
-    });
+    const rapportsServeuses = rapports.filter(r => !adminNames.includes(r.serveur));
 
     // Totaux globaux
-    const totalCA = Object.values(statsByUser).reduce((s,d) => s + d.ca, 0);
-    const totalTk = Object.values(statsByUser).reduce((s,d) => s + d.tickets, 0);
+    const totalCA = rapportsServeuses.reduce((s,r) => s + (r.ca||0), 0);
+    const totalTk = rapportsServeuses.reduce((s,r) => s + (r.tickets||0), 0);
     const avg = totalTk ? Math.round(totalCA / totalTk) : 0;
 
-    // KPIs
-    // Afficher état vide proprement si aucune donnée
-    if(payments.length === 0 && Object.keys(statsByUser).length === 0){
+    // Afficher état vide proprement
+    if(rapportsServeuses.length === 0){
       document.getElementById('patron-kpi-grid').innerHTML = [
         {v:'0 F', l:'CA total', c:'var(--amber-d)'},
         {v:'0', l:'Tickets', c:'var(--green)'},
         {v:'0 F', l:'Ticket moyen', c:'var(--teal)'},
-        {v:S.users.filter(u=>!u.isAdmin).length, l:'Serveuses', c:'var(--blue)'},
+        {v:serveuses.length, l:'Serveuses', c:'var(--blue)'},
       ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
-      document.getElementById('patron-top-articles').innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente — nouveau jour démarré</div>';
-      const serveuses=S.users.filter(u=>!u.isAdmin);
+      document.getElementById('patron-top-articles').innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucun rapport reçu — en attente des serveuses</div>';
       document.getElementById('patron-by-serveur').innerHTML=serveuses.map(u=>`
         <div class="r-row">
-          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div><div style="font-size:10px;color:var(--muted);">0 ticket(s)</div></div>
-          <div class="r-val">0 F</div>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div>
+          <div style="font-size:10px;color:var(--muted);">Rapport non reçu</div></div>
+          <div class="r-val">—</div>
         </div>`).join('');
       return;
     }
 
+    // KPIs
     document.getElementById('patron-kpi-grid').innerHTML = [
       {v:fmt(totalCA), l:'CA total', c:'var(--amber-d)'},
       {v:totalTk, l:'Tickets', c:'var(--green)'},
       {v:fmt(avg), l:'Ticket moyen', c:'var(--teal)'},
       {v:serveuses.length, l:'Serveuses', c:'var(--blue)'},
-    ].map(k => `<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+    ].map(k=>`<div class="kpi"><div class="kpi-v" style="color:${k.c};">${k.v}</div><div class="kpi-l">${k.l}</div></div>`).join('');
 
-    // Top articles depuis les encaissements
-    const items = {};
-    payments.forEach(r => {
-      (r.detail || '').replace(/Encaissement[^:]*:/,'').trim().split(', ').forEach(p => {
-        const m = p.match(/^(\d+)×(.+)$/);
-        if(m) items[m[2].trim()] = (items[m[2].trim()] || 0) + parseInt(m[1]);
+    // Top articles — fusionner les articles de toutes les serveuses
+    const allItems = {};
+    rapportsServeuses.forEach(r => {
+      Object.entries(r.articles||{}).forEach(([nom,qty]) => {
+        allItems[nom] = (allItems[nom]||0) + qty;
       });
     });
-    const sorted = Object.entries(items).sort((a,b) => b[1]-a[1]).slice(0,8);
+    const sorted = Object.entries(allItems).sort((a,b) => b[1]-a[1]).slice(0,8);
     const maxQ = sorted[0] ? sorted[0][1] : 1;
     document.getElementById('patron-top-articles').innerHTML = sorted.length
       ? sorted.map(([n,q]) => `<div class="r-row">
@@ -1393,119 +1369,29 @@ async function loadPatronRapport(){
           </div>
           <div class="r-val">${q}</div>
         </div>`).join('')
-      : '<div style="color:var(--muted);font-size:12px;padding:8px 0;">Aucune vente</div>';
+      : '<div style="color:var(--muted);font-size:12px;">Aucune vente</div>';
 
-    // Ventes par serveuse — toutes affichées même à 0F
-    const maxCA = Math.max(...serveuses.map(u => (statsByUser[u.name]||{ca:0}).ca), 1);
+    // Ventes par serveuse
+    const rapportMap = {};
+    rapportsServeuses.forEach(r => { rapportMap[r.serveur] = r; });
+    const maxCA = Math.max(...serveuses.map(u => (rapportMap[u.name]||{ca:0}).ca), 1);
+
     document.getElementById('patron-by-serveur').innerHTML = serveuses
-      .sort((a,b) => ((statsByUser[b.name]||{ca:0}).ca) - ((statsByUser[a.name]||{ca:0}).ca))
+      .sort((a,b) => ((rapportMap[b.name]||{ca:0}).ca) - ((rapportMap[a.name]||{ca:0}).ca))
       .map(u => {
-        const d = statsByUser[u.name] || {ca:0, tickets:0};
+        const r = rapportMap[u.name];
         return `<div class="r-row">
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:700;">${u.emoji} ${u.name}</div>
-            <div style="font-size:10px;color:var(--muted);">${d.tickets} ticket(s)</div>
-            <div class="r-bar-w"><div class="r-bar" style="width:${Math.round(d.ca/maxCA*100)}%;background:var(--teal);"></div></div>
+            <div style="font-size:10px;color:var(--muted);">${r ? r.tickets+' ticket(s) · Envoyé à '+r.heure_envoi : 'Rapport non reçu'}</div>
+            ${r ? '<div class="r-bar-w"><div class="r-bar" style="width:'+Math.round((r.ca||0)/maxCA*100)+'%;background:var(--teal);"></div></div>' : ''}
           </div>
-          <div class="r-val" style="margin-left:10px;">${fmt(d.ca)}</div>
+          <div class="r-val" style="margin-left:10px;">${r ? fmt(r.ca||0) : '—'}</div>
         </div>`;
       }).join('');
 
   } catch(e) {
-    document.getElementById('patron-kpi-grid').innerHTML = '<div style="color:var(--red);padding:20px;">❌ Erreur de connexion Firebase</div>';
-  }
-}
-
-async function exportPatronRapport(){
-  let journal = [];
-  try{
-    const raw = await fbGet('/journal');
-    if(raw) journal = Object.values(raw).sort((a,b) => (b.ts||0)-(a.ts||0));
-  }catch(e){}
-
-  const payments = journal.filter(r => r.type === 'PAY');
-  const adminNames = S.users.filter(u => u.isAdmin).map(u => u.name);
-  const statsByUser = {};
-  payments.forEach(r => {
-    const name = r.user || '—';
-    if(adminNames.includes(name)) return;
-    if(!statsByUser[name]) statsByUser[name] = {ca:0, tickets:0};
-    statsByUser[name].ca += Number(r.amount) || 0;
-    statsByUser[name].tickets += 1;
-  });
-  const totalCA = Object.values(statsByUser).reduce((s,d) => s+d.ca, 0);
-
-  const lines = [
-    'RAPPORT GÉRANT — Terrasse Resto CHEZ DJADJA — ' + new Date().toLocaleDateString('fr-FR'),
-    'Tél: 01 69 72 94 71',
-    '='.repeat(50),
-    'CA Total: ' + fmt(totalCA),
-    '',
-    'PAR SERVEUSE:',
-    ...S.users.filter(u=>!u.isAdmin).map(u => {
-      const d = statsByUser[u.name] || {ca:0, tickets:0};
-      return '  ' + u.name + ': ' + fmt(d.ca) + ' (' + d.tickets + ' tickets)';
-    }),
-    '',
-    'JOURNAL COMPLET:',
-    '-'.repeat(40),
-    ...journal.map(r => `[${r.time||''}] ${r.type} | ${r.user} | T${r.table} | ${r.detail} | ${r.amount?fmt(r.amount):''}`)
-  ];
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type:'text/plain'}));
-  a.download = 'rapport_gerant_' + new Date().toISOString().slice(0,10) + '.txt';
-  a.click();
-}
-
-function switchPatronCfg(tab,btn){
-  patronCfgTab=tab;
-  document.querySelectorAll('#patron-panel-config .filter-btn').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  const c=document.getElementById('patron-cfg-content');
-  if(tab==='users')renderCfgUsers(c);
-  else if(tab==='menu')renderCfgMenu(c);
-  else if(tab==='tables')renderCfgTables(c);
-  else if(tab==='system')renderCfgSystem(c);
-}
-
-
-// ══ ENVOI RAPPORT AU PATRON ══
-async function envoyerRapportPatron(){
-  const btn = document.getElementById('btn-envoyer-rapport');
-  const badge = document.getElementById('rapport-envoye-badge');
-  btn.textContent = '⏳ Envoi en cours...';
-  btn.disabled = true;
-
-  try{
-    // Envoyer toutes les entrées du journal local vers Firebase
-    const toSend = S.journal.filter(r => r.user === S.user.name);
-    let sent = 0;
-    for(const entry of toSend){
-      await fbPush('/journal', entry);
-      sent++;
-    }
-
-    // Envoyer aussi un résumé des stats
-    const myPayments = S.journal.filter(r => r.type === 'PAY' && r.user === S.user.name);
-    const myCA = myPayments.reduce((s,r) => s + (Number(r.amount)||0), 0);
-    await fbSet('/stats/' + DEVICE_ID, {
-      serveur: S.user.name,
-      ca: myCA,
-      tickets: myPayments.length,
-      last_sync: fmtT(),
-      ts: Date.now()
-    });
-
-    btn.textContent = '📤 Envoyer mon rapport au Patron';
-    btn.disabled = false;
-    badge.style.display = 'block';
-    toast('✅ Rapport envoyé au Patron (' + sent + ' actions)', 'success');
-    setTimeout(() => { badge.style.display = 'none'; }, 5000);
-
-  }catch(e){
-    btn.textContent = '📤 Envoyer mon rapport au Patron';
-    btn.disabled = false;
-    toast('❌ Erreur — vérifiez votre connexion internet', 'error');
+    document.getElementById('patron-kpi-grid').innerHTML = '<div style="color:var(--red);padding:20px;font-size:13px;">❌ Erreur de connexion Firebase</div>';
   }
 }
 
@@ -1521,6 +1407,48 @@ function confirmNouveauJourServeuse(){
   // Also clear this device's stats from Firebase
   try{fbSet('/stats/'+DEVICE_ID, null);}catch(e){}
   toast('🌅 Nouveau jour démarré !','success');
+}
+
+
+// ══ ENVOI RAPPORT AU PATRON ══
+async function envoyerRapportPatron(){
+  const btn = document.getElementById('btn-envoyer-rapport');
+  const badge = document.getElementById('rapport-envoye-badge');
+  btn.textContent = '⏳ Envoi en cours...';
+  btn.disabled = true;
+  try{
+    const nom = S.user.name;
+    const myPayments = S.journal.filter(r => r.type === 'PAY' && r.user === nom);
+    const myCA = myPayments.reduce((s,r) => s + (Number(r.amount)||0), 0);
+    const myTickets = myPayments.length;
+    const items = {};
+    myPayments.forEach(r => {
+      (r.detail||'').replace(/Encaissement[^:]*:/,'').trim().split(', ').forEach(p => {
+        const m = p.match(/^(\d+)×(.+)$/);
+        if(m) items[m[2].trim()] = (items[m[2].trim()]||0) + parseInt(m[1]);
+      });
+    });
+    const key = nom.toLowerCase().replace(/\s+/g,'_');
+    await fbSet('/rapports/' + key, {
+      serveur: nom,
+      ca: myCA,
+      tickets: myTickets,
+      articles: items,
+      journal: S.journal.filter(r => r.user === nom),
+      date: new Date().toLocaleDateString('fr-FR'),
+      heure_envoi: fmtT(),
+      ts: Date.now()
+    });
+    btn.textContent = '📤 Envoyer mon rapport au Patron';
+    btn.disabled = false;
+    badge.style.display = 'block';
+    toast('✅ Rapport envoyé — ' + fmt(myCA) + ' / ' + myTickets + ' ticket(s)', 'success');
+    setTimeout(() => { badge.style.display = 'none'; }, 6000);
+  }catch(e){
+    btn.textContent = '📤 Envoyer mon rapport au Patron';
+    btn.disabled = false;
+    toast('❌ Erreur — vérifiez votre connexion internet', 'error');
+  }
 }
 
 // ══ BOOT ══
